@@ -33,7 +33,7 @@ class TestSettings(unittest.TestCase):
 
     def test_settings(self):
         settings = Settings(
-            self.TEST_SETTINGS_FILE, 'test_settings', None,
+            self.TEST_SETTINGS_FILE, 'test_settings',
             self.TEMP_TEST_DIR, verbosity=True
         )
 

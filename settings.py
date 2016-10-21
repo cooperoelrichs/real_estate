@@ -4,8 +4,7 @@ import os
 
 class Settings(object):
     def __init__(self, settings_file_path, run_type,
-                 url_manager, run_dir, verbosity):
-        self.url_manager = url_manager
+                 run_dir, verbosity):
         self.run_dir = run_dir
         self.verbosity = verbosity
 

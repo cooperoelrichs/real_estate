@@ -1,5 +1,5 @@
 {
-    "sales_settings": {
+    "sales": {
         "data_dir": "data",
         "html_dir": "data/html",
         "data_file": "realestate_sales_data.h5",
@@ -7,7 +7,7 @@
         "failures_log": "failures_log_sales.csv"
     },
 
-    "rentals_settings": {
+    "rentals": {
         "data_dir": "data",
         "html_dir": "data/html",
         "data_file": "realestate_rentals_data.h5",
