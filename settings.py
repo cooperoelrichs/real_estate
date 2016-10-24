@@ -27,5 +27,4 @@ class Settings(object):
         if not os.path.isdir(dir_path) and self.verbosity is True:
             print('Making the directory: %s' % dir_path)
 
-        print('MAKING %s' % dir_path)
         os.makedirs(dir_path, exist_ok=True)
