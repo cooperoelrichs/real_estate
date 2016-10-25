@@ -34,7 +34,7 @@ class TestSettings(unittest.TestCase):
     def test_settings(self):
         settings = Settings(
             self.TEST_SETTINGS_FILE, 'test_settings',
-            self.TEMP_TEST_DIR, verbosity=True
+            self.TEMP_TEST_DIR, verbosity=False
         )
 
         self.assertIs(type(settings), Settings)

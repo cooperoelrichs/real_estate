@@ -33,7 +33,7 @@ class WebsiteScraper(object):
         valids, invalids = WebsiteScraper.split_scrapings(scrapings)
         WebsiteScraper.report_on_failures(invalids)
         WebsiteScraper.log_failures(invalids, log_file_path)
-        return valids
+        return valids, invalids
 
     def retrieve_all_pages(url_manager):
         soups = []
