@@ -6,18 +6,25 @@ import bs4
 import pandas as pd
 from scraper.page_scraper import PageScraper
 from real_estate.json_load_and_dump import JSONLoadAndDump
+from real_estate.data_storer import DataStorer
 
 
-class WebsiteScraper(object):
+class WebsiteScraper():
     def to_hdf(properties, file_path, scrape_datetime):
+        raise RuntimeError('removed.')
+
+    def to_df(properties, file_path, scrape_datetime):
         if len(properties) == 0:
             raise RuntimeError('Properties list is empty.')
 
         data = [p.to_tuple() + (scrape_datetime,) for p in properties]
-        column_names = properties[0].column_names() + ('datetime',)
+        column_names = properties[0].column_names() + ('date_scraped')
         df = pd.DataFrame.from_records(data, columns=column_names)
-        df.to_hdf(file_path, 'properties', append=False)
         return df
+
+    def update_data_store(df, file_path):
+        raise RuntimeError('Properties must have dates.')
+        DataStorer.update_data_store(df, file_path)
 
     def retrieve_and_json_all_pages(url_manager, file_path):
         soups = WebsiteScraper.retrieve_all_pages(url_manager)
