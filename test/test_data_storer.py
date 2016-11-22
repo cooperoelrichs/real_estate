@@ -33,12 +33,23 @@ class TestDataStorer(unittest.TestCase):
             ['e', 3, 1.3, dt(1, 1, 9, 0, 0, 0)],
         ]
     )
-    EXPECTED_AFTER_UPDATE_LAST_SEEN = pd.DataFrame(
+    EXPECTED_AFTER_UPDATING_BROKEN_SEQUENCES = pd.DataFrame(
+        columns=EXISTING_DATA_COLUMN_NAMES,
+        data=[
+            ['a', 1, 1.1, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 1, 0, 0, 0), False],
+            ['b', 2, 1.1, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 2, 0, 0, 0), True],
+            ['c', 1, 1.2, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 1, 0, 0, 0), True],
+            ['d', 2, 1.1, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 2, 0, 0, 0), True],
+            ['e', 3, 1.3, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 1, 0, 0, 0), True],
+            ['e', 3, 1.3, dt(1, 1, 2, 0, 0, 0), dt(1, 1, 3, 0, 0, 0), False],
+        ]
+    )
+    EXPECTED_AFTER_UPDATING_LAST_ENCOUNTED = pd.DataFrame(
         columns=EXISTING_DATA_COLUMN_NAMES,
         data=[
             ['a', 1, 1.1, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), False],
-            ['b', 2, 1.1, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), False],
-            ['c', 1, 1.2, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 1, 0, 0, 0), True],
+            ['b', 2, 1.1, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), True],
+            ['c', 1, 1.2, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 1, 0, 0, 0), False],
             ['d', 2, 1.1, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 2, 0, 0, 0), True],
             ['e', 3, 1.3, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 1, 0, 0, 0), True],
             ['e', 3, 1.3, dt(1, 1, 2, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), False],
@@ -53,6 +64,23 @@ class TestDataStorer(unittest.TestCase):
             ['d', 2, 1.1, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 2, 0, 0, 0), True],
             ['e', 3, 1.3, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 1, 0, 0, 0), True],
             ['e', 3, 1.3, dt(1, 1, 2, 0, 0, 0), dt(1, 1, 3, 0, 0, 0), False],
+            ['b', 2, 1.1, dt(1, 1, 9, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), False],
+            ['c', 1, 1.3, dt(1, 1, 9, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), False],
+            ['c', 2, 1.2, dt(1, 1, 9, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), False],
+            ['cc', 2, 1.2, dt(1, 1, 9, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), False],
+            ['d', 2, 1.1, dt(1, 1, 9, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), False],
+            ['e', 3, 1.3, dt(1, 1, 2, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), False],
+        ]
+    )
+    UPDATED_DATA = pd.DataFrame(
+        columns=EXISTING_DATA_COLUMN_NAMES,
+        data=[
+            ['a', 1, 1.1, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), False],
+            ['b', 2, 1.1, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), True],
+            ['c', 1, 1.2, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 1, 0, 0, 0), True],
+            ['d', 2, 1.1, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 2, 0, 0, 0), True],
+            ['e', 3, 1.3, dt(1, 1, 1, 0, 0, 0), dt(1, 1, 1, 0, 0, 0), True],
+            ['e', 3, 1.3, dt(1, 1, 2, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), False],
             ['c', 1, 1.3, dt(1, 1, 9, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), False],
             ['c', 2, 1.2, dt(1, 1, 9, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), False],
             ['cc', 2, 1.2, dt(1, 1, 9, 0, 0, 0), dt(1, 1, 9, 0, 0, 0), False],
@@ -61,11 +89,29 @@ class TestDataStorer(unittest.TestCase):
         ]
     )
 
-    def test_update_data_store(self):
-        self.assertEqual(True, False)
+    def test_update_broken_sequences(self):
+        self.assertTrue(
+            DataStorer.update_broken_sequences(
+                self.CURRENT_DATA, self.NEW_DATA
+            ).equals(
+                self.EXPECTED_AFTER_UPDATING_BROKEN_SEQUENCES
+            )
+        )
 
-    def test_update_last_seen(self):
-        self.assertEqual(True, False)
+    def test_last_encounted(self):
+        self.assertEqual(
+            DataStorer.last_encounted(self.CURRENT_DATA, self.NEW_DATA),
+            self.EXPECTED_AFTER_UPDATING_LAST_ENCOUNTED
+        )
 
     def test_add_new(self):
-        self.assertEqual(True, False)
+        self.assertEqual(
+            DataStorer.add_new(self.CURRENT_DATA, self.NEW_DATA),
+            self.EXPECTED_AFTER_ADD_NEW
+        )
+
+    def test_update_data(self):
+        self.assertEqual(
+            DataStorer.update_data(self.CURRENT_DATA, self.NEW_DATA),
+            self.UPDATED_DATA
+        )
