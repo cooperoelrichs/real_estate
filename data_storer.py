@@ -21,7 +21,6 @@ class DataStorer():
 
         updated_data = DataStorer.update_data(current_data, new_data)
         DataStorer.to_hdf(updated_data, file_path)
-        quit()
 
     def update_data(current_data, new_data):
         wip_data = DataStorer.update_unbroken_sequences(current_data, new_data)
