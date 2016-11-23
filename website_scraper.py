@@ -13,17 +13,17 @@ class WebsiteScraper():
     def to_hdf(properties, file_path, scrape_datetime):
         raise RuntimeError('removed.')
 
-    def to_df(properties, file_path, scrape_datetime):
+    def to_df(properties, scrape_datetime):
         if len(properties) == 0:
             raise RuntimeError('Properties list is empty.')
 
         data = [p.to_tuple() + (scrape_datetime,) for p in properties]
-        column_names = properties[0].column_names() + ('date_scraped')
+        column_names = properties[0].column_names() + ('date_scraped',)
         df = pd.DataFrame.from_records(data, columns=column_names)
         return df
 
     def update_data_store(df, file_path):
-        raise RuntimeError('Properties must have dates.')
+        DataStorer.create_new_unless_exists(df, file_path)
         DataStorer.update_data_store(df, file_path)
 
     def retrieve_and_json_all_pages(url_manager, file_path):
@@ -38,7 +38,7 @@ class WebsiteScraper():
 
     def filter_scrapings(scrapings, log_file_path):
         valids, invalids = WebsiteScraper.split_scrapings(scrapings)
-        WebsiteScraper.report_on_failures(invalids)
+        # WebsiteScraper.report_on_failures(invalids)
         WebsiteScraper.log_failures(invalids, log_file_path)
         return valids, invalids
 
