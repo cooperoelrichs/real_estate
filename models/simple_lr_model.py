@@ -15,45 +15,99 @@ class XY(object):
         ('suburb', 'categorical')
     ]
 
-    def __init__(self, df):
+    def setup_self(self, df, exclude_suburb):
+        self.exclude_suburb = exclude_suburb
         df = self.filter_data(df)
         self.y = self.make_y(df)
-        X = self.make_x(df)
-        self.X = X.values
-        self.X_columns = X.columns
+        self.X = self.make_x(df)
 
-    def filter_data(self, df):
-        # Required data: sale_type, price, and suburb
-        df = df[
-            (
-                (df['sale_type'] == 'Private Treaty') |
-                (df['sale_type'] == 'Maybe Private Treaty')
-            ) &
+    def general_data_filter(self, df):
+        return (
             (np.isfinite(df['price_min']) | np.isfinite(df['price_max'])) &
             pd.notnull(df['suburb']) &
             np.isfinite(df['bedrooms']) &
             np.isfinite(df['bathrooms']) &
             np.isfinite(df['garage_spaces'])
-        ]
-        return df
+        )
 
     def make_y(self, df):
-        return df[['price_min', 'price_max']].values.mean(axis=1)
+        return df[['price_min', 'price_max']].mean(axis=1)
 
     def make_x(self, df):
-        X = df[[a for a, _ in self.X_DATA]]
-        cats = [a for a, b in self.X_DATA if b == 'categorical']
-        X = pd.get_dummies(X, prefix=cats, prefix_sep='_', columns=cats)
+        individualised_x_data = self.X_DATA
+        if self.exclude_suburb:
+            individualised_x_data -= {('suburb', 'categorical')}
+
+
+        X = df[[a for a, _ in individualised_x_data]].copy()
+        cats = [a for a, b in individualised_x_data if b == 'categorical']
+
+        # Drop the 'Not Specified' property_type so that we have
+        # identifiable coefficients.
+        X.loc[X['property_type']=='Not Specified', 'property_type'] = np.NaN
+
+        if not self.exclude_suburb:
+            littlest_suburb = X['suburb'].value_counts().sort_index().sort_values().index[0]
+            X.loc[X['suburb']==littlest_suburb, 'suburb'] = np.NaN
+
+        X = pd.get_dummies(
+            X, prefix=cats, prefix_sep='_', columns=cats,
+            drop_first=False, dummy_na=False
+        )
+
         return X
+
+
+class SalesXY(XY):
+    def __init__(self, df, exclude_suburb=False):
+        self.setup_self(df, exclude_suburb)
+
+    def sale_type_data_filter(self, df):
+        return (
+            (df['sale_type'] == 'Private Treaty') |
+            (df['sale_type'] == 'Maybe Private Treaty')
+        )
+
+    def filter_data(self, df):
+        # Required data: sale_type, price, and suburb
+        df = df[
+            self.sale_type_data_filter(df) &
+            self.general_data_filter(df)
+        ]
+
+        return df
+
+
+class RentalsXY(XY):
+    def __init__(self, df, exclude_suburb=False):
+        self.setup_self(df, exclude_suburb)
+
+    def rentals_data_filter(self, df):
+        return (
+            (df['sale_type'] == 'Rental')
+        )
+
+    def filter_data(self, df):
+        # Required data: sale_type, price, and suburb
+        df = df[
+            self.rentals_data_filter(df) &
+            self.general_data_filter(df)
+        ]
+        return df
 
 
 class PriceModel(object):
     def __init__(self, X, y):
         self.model = LinearRegression(
-            fit_intercept=True, normalize=False, copy_X=True, n_jobs=1)
+            fit_intercept=True, normalize=True, copy_X=True, n_jobs=1
+        )
         self.X = X
         self.y = y
         self.seed = 1
+
+    def predict(self):
+        self.model.fit(self.X, self.y)
+        return self.model.predict(self.X)
 
     def cv_predict(self):
         folds = cross_validation.KFold(

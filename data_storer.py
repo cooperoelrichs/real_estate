@@ -120,7 +120,7 @@ class DataStorer():
                 unbrokens, id_columns
             )
         )
-        new_uniques = new_data[new_uniques_filter]
+        new_uniques = new_data[new_uniques_filter].copy()
 
         if new_uniques.empty:
             return current_data
