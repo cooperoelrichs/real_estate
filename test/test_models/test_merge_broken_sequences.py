@@ -17,8 +17,8 @@ class TestMerger(unittest.TestCase):
         data=[
             ['a', 1, 'private treaty', 1, 2, datetime(2017, 1, 1), datetime(2017, 2, 1), True],
             ['a', 1, 'private treaty', 3, 3, datetime(2017, 2, 2), datetime(2017, 3, 1), True],
-            ['a', 1, 'auction', 3, 3, datetime(2017, 2, 2), datetime(2017, 3, 1), False],
-            ['b', 1, 'private treaty', 2, 2, datetime(2017, 4, 1), datetime(2017, 6, 1), False],
+            ['a', 1, 'auction', 3, 3, datetime(2017, 2, 2), datetime(2017, 9, 1), False],
+            ['b', 1, 'private treaty', 2, 2, datetime(2017, 4, 1), datetime(2017, 9, 1), False],
             ['c', 1, 'private treaty', 4, 4, datetime(2017, 1, 1), datetime(2017, 2, 1), True],
             ['c', 1, 'private treaty', 4, 4, datetime(2017, 2, 2), datetime(2017, 4, 1), True],
             ['c', 1, 'private treaty', 5, 5, datetime(2017, 4, 2), datetime(2017, 9, 1), False],
@@ -30,8 +30,8 @@ class TestMerger(unittest.TestCase):
     EXPECTED_DF = pd.DataFrame(
         data=[
             ['a', 1, 'private treaty', 3, 3, datetime(2017, 1, 1), datetime(2017, 3, 1), True],
-            ['a', 1, 'auction', 3, 3, datetime(2017, 2, 2), datetime(2017, 3, 1), False],
-            ['b', 1, 'private treaty', 2, 2, datetime(2017, 4, 1), datetime(2017, 6, 1), False],
+            ['a', 1, 'auction', 3, 3, datetime(2017, 2, 2), datetime(2017, 9, 1), False],
+            ['b', 1, 'private treaty', 2, 2, datetime(2017, 4, 1), datetime(2017, 9, 1), False],
             ['c', 1, 'private treaty', 5, 5, datetime(2017, 1, 1), datetime(2017, 9, 1), False],
             ['b', 1, 'private treaty', 2, 2, datetime(2017, 1, 1), datetime(2017, 2, 1), True],
         ],
@@ -69,7 +69,7 @@ class TestMerger(unittest.TestCase):
     def test_merger(self):
         assert_frame_equal(
             self.EXPECTED_DF,
-            Merger.merge_on_price_change(self.TEST_DF)
+            Merger.merge_on_price_changes(self.TEST_DF)
         )
 
     def test_check_for_unbrokens(self):

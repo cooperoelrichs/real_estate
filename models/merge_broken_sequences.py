@@ -27,12 +27,12 @@ class Merger(object):
         Merger.check_for_parrallel_listings(df)
 
     def check_for_unbrokens(df):
-        unbroken_last_encountereds = np.sort(
+        unbroken_last_encounteds = np.sort(
             df[~ df['sequence_broken']]['last_encounted'].unique()
         )
-        if len(unbroken_last_encountereds) != 1:
+        if len(unbroken_last_encounteds) != 1:
             damaged_rows = df[
-                df['last_encounted'].isin(unbroken_last_encountereds[:-1]) &
+                df['last_encounted'].isin(unbroken_last_encounteds[:-1]) &
                 ~ df['sequence_broken']
             ]
             raise UnbrokenListingsError(
@@ -44,15 +44,14 @@ class Merger(object):
         property_columns = Merger.property_columns(df)
         df = Merger.sort_df(df)
 
-        property_equality_with_next = (
-            df[property_columns] == df[property_columns].shift(-1)
-        ).all(axis=1)
+        equality_with_next = Merger.property_equality_with_next(
+            df, property_columns)
         parallel_with_next = (
             df['last_encounted'] >= df['first_encounted'].shift(-1)
         )
         parallel_with_next[-1:] = False
         parallel_listings_check = (
-            property_equality_with_next & parallel_with_next
+            equality_with_next & parallel_with_next
         )
 
         if (parallel_listings_check).any():
@@ -66,6 +65,12 @@ class Merger(object):
                 'Parallel listings were found.\n' +
                 'Parallel listings:\n%s' % str(parallel_listings)
             )
+
+    def property_equality_with_next(df, property_columns):
+        # return (
+        #     df[property_columns] == df[property_columns].shift(-1)
+        # ).all(axis=1)
+        return df.duplicated(subset=property_columns, keep='last')
 
     def check_ordering_of_encounted_dates(df):
         fe_gt_le = df['first_encounted'] > df['last_encounted']
@@ -86,46 +91,81 @@ class Merger(object):
         )
         return df
 
-    def merge_on_price_change(df):
-        # 1. Get duplicates
-        # 2. Sort by property columns then first_encountered and
-        #    last_encountered
-        # 3. Filter time diffs greater than MAX_TIME_DIFF
-        # 4. Filter on broken sequences
-        # 5. Update the first_encountered column
-        # 5. Return the filtered df
-
+    def check_and_merge_on_price_changes(df):
         Merger.check_ordering_of_encounted_dates(df)
         Merger.check_for_unbrokens(df)
         Merger.check_for_parrallel_listings(df)
 
+        Merger.merge_on_price_changes(df)
+
+    def merge_on_price_changes(df):
+        # Merge identicle properties that have been off the market for less
+        # than the maximum specified time difference.
+        property_columns = Merger.property_columns(df)
         df = Merger.sort_df(df)
 
-        property_columns = Merger.property_columns(df)
-        time_diff = df['first_encounted'].shift(-1) - df['last_encounted']
-        last_only = df.duplicated(subset=property_columns, keep='last')
-        first_only = ~ df.duplicated(subset=property_columns, keep='first')
+        time_diff_to_next_lt_max, time_diff_to_previous_lt_max = (
+            Merger.create_time_diff_filters(df)
+        )
 
-        # print(df[df.columns.difference(['sequence_broken'])])
-        # print(first_only)
-        # print(df[first_only][df.columns.difference(['sequence_broken'])])
+        equality_with_next = Merger.property_equality_with_next(
+            df, property_columns
+        )
+        equality_with_previous = df.duplicated(
+            subset=property_columns, keep='first'
+        )
 
-        df_new = df[
-            ~ df['sequence_broken'] |
-            ~ last_only |
+        merged_df = df[
             ~ (
-                (time_diff <= Merger.MAX_TIME_DIFF) &
-                (time_diff >= timedelta(days=0))
+                equality_with_next &
+                time_diff_to_next_lt_max
             )
-        ]
+        ].copy()
 
-        # print(df_new[df.columns.difference(['sequence_broken'])])
+        updated_df = Merger.update_first_encounted_values(
+            df, merged_df,
+            time_diff_to_next_lt_max, time_diff_to_previous_lt_max,
+            equality_with_next, equality_with_previous
+        )
+        return updated_df.sort_index()
 
-        print(first_only.index)
-        print(first_only)
-        df_new.loc[:, 'first_encounted'] = df.loc[first_only, 'first_encounted']
+    def update_first_encounted_values(
+        df, merged_df,
+        time_diff_to_next_lt_max, time_diff_to_previous_lt_max,
+        equality_with_next, equality_with_previous
+    ):
+        firsts_in_duplicates = (
+            (~ equality_with_previous) &
+            equality_with_next &
+            time_diff_to_next_lt_max
+        )
+        lasts_in_duplicates = (
+            equality_with_previous &
+            (~ equality_with_next) &
+            time_diff_to_previous_lt_max
+        )
+
+        initial_first_encounted_values = df.loc[
+            firsts_in_duplicates, 'first_encounted'
+        ].copy().values
+
+        merged_df.loc[
+            lasts_in_duplicates, 'first_encounted'
+        ] = initial_first_encounted_values
+
+        return merged_df
 
 
-        df_new = df_new.sort_index()
-        print(df_new[df.columns.difference(['sequence_broken'])])
-        return df_new
+    def create_time_diff_filters(df):
+        time_diff_to_next = (
+            df['first_encounted'].shift(-1) - df['last_encounted']
+        )
+        time_diff_to_next_lt_max = (time_diff_to_next <= Merger.MAX_TIME_DIFF)
+
+        time_diff_to_previous = (
+            df['first_encounted'] - df['last_encounted'].shift(1)
+        )
+        time_diff_to_previous_lt_max = (
+            time_diff_to_previous <= Merger.MAX_TIME_DIFF
+        )
+        return time_diff_to_next_lt_max, time_diff_to_previous_lt_max
