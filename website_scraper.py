@@ -6,7 +6,7 @@ import bs4
 import pandas as pd
 from scraper.page_scraper import PageScraper
 from real_estate.json_load_and_dump import JSONLoadAndDump
-from real_estate.data_storer import DataStorer
+from real_estate.data_processing.data_storer import DataStorer
 
 
 class WebsiteScraper():

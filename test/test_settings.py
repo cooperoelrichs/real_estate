@@ -5,7 +5,7 @@ from real_estate.settings import Settings
 
 
 class TestSettings(unittest.TestCase):
-    TEST_DIR = os.path.join('real_estate', 'test', 'data')
+    TEST_DIR = os.path.join('real_estate', 'test', 'test_data')
     TEST_SETTINGS_FILE = os.path.join(TEST_DIR, 'test_settings.json')
     TEMP_TEST_DIR = os.path.join(TEST_DIR, 'settings_tests')
 

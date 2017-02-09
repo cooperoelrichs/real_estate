@@ -1,11 +1,11 @@
 import unittest
 from datetime import datetime as dt
 import pandas as pd
-from real_estate.data_storer import DataStorer
+from real_estate.data_processing.data_storer import DataStorer
 
 
 class TestDataStorer(unittest.TestCase):
-    TEST_DATA_DIR = 'real_estate/test/data/'
+    TEST_DATA_DIR = 'real_estate/test/test_data/'
     TEST_CURRENT_DATA_FILE = TEST_DATA_DIR + 'current_data_sales.h5'
     TEST_NEW_DATA_FILE = TEST_DATA_DIR + 'new_data_sales.h5'
     TEST_UPDATED_DATA_FILE = TEST_DATA_DIR + 'updated_data_sales.h5'
@@ -109,30 +109,10 @@ class TestDataStorer(unittest.TestCase):
             )
         )
 
-    def test_update_data_applied_repeatedly(self):
+    def test_repeatedly_update_data_using_synthetic_data(self):
         updated_data = DataStorer.update_data(
             self.CURRENT_DATA.copy(), self.NEW_DATA.copy())
-        reupdated_data = DataStorer.update_data(
-            updated_data.copy(), self.NEW_DATA.copy())
-
-        self.assertTrue(reupdated_data.equals(self.UPDATED_DATA))
-
-    def test_update_data_using_real_data(self):
-        current_data = pd.read_hdf(self.TEST_CURRENT_DATA_FILE)
-        new_data = pd.read_hdf(self.TEST_NEW_DATA_FILE)
-        expected_updated_data = pd.read_hdf(self.TEST_UPDATED_DATA_FILE)
-
-        resultant_updated_data = DataStorer.update_data(
-            current_data.copy(), new_data.copy())
-
-        self.assertEqual(
-            expected_updated_data.shape, resultant_updated_data.shape)
-        self.assertTrue(
-            expected_updated_data.equals(resultant_updated_data))
-
         repeatedly_updated_data = DataStorer.update_data(
-            resultant_updated_data.copy(), new_data.copy())
-        self.assertEqual(
-            expected_updated_data.shape, repeatedly_updated_data.shape)
-        self.assertTrue(
-            expected_updated_data.equals(repeatedly_updated_data))
+            updated_data, self.NEW_DATA.copy())
+
+        self.assertTrue(repeatedly_updated_data.equals(self.UPDATED_DATA))

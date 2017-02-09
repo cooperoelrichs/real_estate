@@ -5,7 +5,7 @@ from real_estate.json_load_and_dump import JSONLoadAndDump
 
 
 class TestAddressParser(unittest.TestCase):
-    TEST_ADDRESSES = 'real_estate/test/data/test_addresses.json'
+    TEST_ADDRESSES = 'real_estate/test/test_data/test_addresses.json'
 
     def open_test_data(self):
         return JSONLoadAndDump.load_from_file(self.TEST_ADDRESSES)
