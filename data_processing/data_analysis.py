@@ -5,27 +5,41 @@ from IPython.display import display, HTML
 
 
 class DataAnalysis():
-    def run_data_analysis(data_file_path, xy_class):
+    def run_data_analysis(data_file_path, xy_class, outputs_dir):
         data = DataAnalysis.read_data(data_file_path)
         xy = xy_class(data, exclude_suburb=False)
-        DataAnalysis.data_summary(data, xy)
+        DataAnalysis.data_summary(data, xy, outputs_dir)
 
     def read_data(data_file_path):
         return pd.read_hdf(data_file_path)
 
-    def display_styler_as_html(styler):
-        display(HTML(styler.render()))
-
     def display_df_as_html(df):
         DataAnalysis.display_styler_as_html(df.style)
 
+    def display_styler_as_html(styler):
+        display(HTML(styler.render()))
+
     def display_df_as_html_with_nowrap(df):
-        styler = df.style.set_table_styles(
-            [{'selector': 'td', 'props': [('white-space', 'nowrap')]}]
-        )
+        styler = DataAnalysis.make_styler_with_nowrap(df)
         DataAnalysis.display_styler_as_html(styler)
 
-    def analyse_broken_sequences(filtered_data, xy):
+    def save_df_as_html(df, file_path):
+        DataAnalysis.save_styler_as_html(df.style, file_path)
+
+    def save_styler_as_html(styler, file_path):
+        with open(file_path, 'w') as f:
+            f.write(styler.render())
+
+    def save_df_as_html_with_nowrap(df, file_path):
+        styler = DataAnalysis.make_styler_with_nowrap(df)
+        DataAnalysis.save_styler_as_html(styler, file_path)
+
+    def make_styler_with_nowrap(df):
+        return df.style.set_table_styles(
+            [{'selector': 'td', 'props': [('white-space', 'nowrap')]}]
+        )
+
+    def analyse_broken_sequences(filtered_data, xy, output_file):
         ordered_column_names_wo_price = [
             'state', 'suburb', 'postcode', 'road', 'house', 'house_number',
             'property_type', 'bedrooms', 'bathrooms', 'garage_spaces',
@@ -37,10 +51,10 @@ class DataAnalysis():
         duplicated = sorted_data.duplicated(
             ordered_column_names_wo_price, keep=False)
 
-        DataAnalysis.display_df_as_html_with_nowrap(
-            sorted_data[duplicated][:9])
+        DataAnalysis.save_df_as_html_with_nowrap(
+            sorted_data[duplicated], output_file)
 
-    def data_summary(data, xy):
+    def data_summary(data, xy, outputs_dir):
         filtered_data = xy.filter_data(data)
 
         num_initial = data.shape[0]
@@ -48,17 +62,24 @@ class DataAnalysis():
         num_seq_broken = data[data['sequence_broken']==False].shape[0]
         num_records = data.shape[0]
 
-        print('Filtered from %i to %i records, %.2f remaining' % (
-            num_initial, num_filtered, num_filtered / num_initial
-        ))
-        print('Records with broken sequences, %i of %i, %.2f broken.' % (
-            num_seq_broken, num_records, num_seq_broken / num_records
-        ))
-        # print('---\nColumns with nulls:')
-        # print(filtered_data.isnull().any(axis=0))
+        with open(outputs_dir + 'data_notes.txt', 'w') as f:
+            f.write(
+                'Filtered from %i to %i records, %.2f remaining' % (
+                    num_initial, num_filtered, num_filtered / num_initial)
+            )
+            f.write(
+                'Records with broken sequences, %i of %i, %.2f broken.' % (
+                    num_seq_broken, num_records, num_seq_broken / num_records)
+            )
 
-        DataAnalysis.display_df_as_html(filtered_data.describe())
-        DataAnalysis.analyse_broken_sequences(filtered_data, xy)
+        DataAnalysis.save_df_as_html(
+            filtered_data.describe(),
+            outputs_dir + 'filtered_data_discription.html'
+        )
+        DataAnalysis.analyse_broken_sequences(
+            filtered_data, xy,
+            outputs_dir + 'dupicates.html'
+        )
 
     # def _(df):
     #     df['price_avg'] = (df['price_min'] + df['price_max']) / 2

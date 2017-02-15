@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn import cross_validation
+from real_estate.models.data_merger import Merger
 
 
 class XY(object):
@@ -15,9 +16,13 @@ class XY(object):
         ('suburb', 'categorical')
     ]
 
-    def setup_self(self, df, exclude_suburb):
+    def setup_self(self, df, exclude_suburb, perform_merges):
         self.exclude_suburb = exclude_suburb
         df = self.filter_data(df)
+
+        if perform_merges:
+            df = Merger.check_and_merge_on_price_changes(df)
+
         self.y = self.make_y(df)
         self.X = self.make_x(df)
 
@@ -59,8 +64,8 @@ class XY(object):
 
 
 class SalesXY(XY):
-    def __init__(self, df, exclude_suburb=False):
-        self.setup_self(df, exclude_suburb)
+    def __init__(self, df, exclude_suburb=False, perform_merges=True):
+        self.setup_self(df, exclude_suburb, perform_merges)
 
     def sale_type_data_filter(self, df):
         return (
@@ -79,8 +84,8 @@ class SalesXY(XY):
 
 
 class RentalsXY(XY):
-    def __init__(self, df, exclude_suburb=False):
-        self.setup_self(df, exclude_suburb)
+    def __init__(self, df, exclude_suburb=False, perform_merges=True):
+        self.setup_self(df, exclude_suburb, perform_merges)
 
     def rentals_data_filter(self, df):
         return (

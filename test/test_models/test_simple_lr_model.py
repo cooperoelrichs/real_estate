@@ -39,10 +39,10 @@ class TestXY(unittest.TestCase):
 
     def test_sales_xy(self):
         (self.TEST_SALES_DF.columns)
-        self.xy_tests(SalesXY(self.TEST_SALES_DF))
+        self.xy_tests(SalesXY(self.TEST_SALES_DF, perform_merges=False))
 
     def test_rentals_xy(self):
-        self.xy_tests(RentalsXY(self.TEST_RENTALS_DF))
+        self.xy_tests(RentalsXY(self.TEST_RENTALS_DF, perform_merges=False))
 
     def xy_tests(self, xy):
         self.assertEqual(xy.X.shape, (2, 6))
