@@ -18,10 +18,11 @@ class XY(object):
 
     def setup_self(self, df, exclude_suburb, perform_merges):
         self.exclude_suburb = exclude_suburb
+        self.perform_merges = perform_merges
         df = self.filter_data(df)
 
-        if perform_merges:
-            df = Unduplicator.check_and_merge_on_price_changes(df)
+        if self.perform_merges:
+            df = Unduplicator.check_and_unduplicate(df)
 
         self.y = self.make_y(df)
         self.X = self.make_x(df)
@@ -79,7 +80,6 @@ class SalesXY(XY):
             self.sale_type_data_filter(df) &
             self.general_data_filter(df)
         ]
-
         return df
 
 

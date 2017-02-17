@@ -104,6 +104,18 @@ class TestUnduplicator(unittest.TestCase):
         columns=TEST_COLUMNS
     )
 
+    DF_WITH_ORDERED_LISTINGS = pd.DataFrame(
+        data=[
+            ['a', 1, 'x', 2, 3, datetime(2017, 1, 1), datetime(2017, 2, 1), True],
+            ['a', 1, 'x', 2, 3, datetime(2017, 2, 1), datetime(2017, 3, 1), True],
+            ['b', 1, 'x', 2, 3, datetime(2017, 2, 1), datetime(2017, 3, 1), True],
+            ['b', 1, 'x', 2, 3, datetime(2017, 2, 1), datetime(2017, 3, 1), True],
+            ['c', 1, 'x', 2, 3, datetime(2017, 1, 1), datetime(2017, 3, 1), True],
+            ['c', 1, 'x', 2, 3, datetime(2017, 1, 2), datetime(2017, 2, 1), True],
+        ],
+        columns=TEST_COLUMNS
+    )
+
     def test_make_subgroups_series(self):
         assert_series_equal(
             pd.Series([1, 1,1,1,2,1,1,1]),
@@ -134,6 +146,13 @@ class TestUnduplicator(unittest.TestCase):
             Unduplicator.check_ordering_of_listings,
             self.DF_WITH_UNORDERED_LISTINGS.copy()
         )
+
+        try:
+            Unduplicator.check_ordering_of_listings(
+                self.DF_WITH_ORDERED_LISTINGS
+            )
+        except UnorderedListingsError:
+            self.fail()
 
     def test_check_ordering_of_encounted_dates(self):
         self.assertRaises(
