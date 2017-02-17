@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn import cross_validation
-from real_estate.models.data_merger import Merger
+from real_estate.models.unduplicator import Unduplicator
 
 
 class XY(object):
@@ -21,7 +21,7 @@ class XY(object):
         df = self.filter_data(df)
 
         if perform_merges:
-            df = Merger.check_and_merge_on_price_changes(df)
+            df = Unduplicator.check_and_merge_on_price_changes(df)
 
         self.y = self.make_y(df)
         self.X = self.make_x(df)
