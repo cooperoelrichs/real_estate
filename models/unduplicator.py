@@ -26,7 +26,8 @@ class ListingsSubgrouper(object):
         self.max_time_diff = max_time_diff
 
     def group(self, r):
-        previous_index = self.df.index[self.df.index.get_loc(r.name) - 1]
+        r_index = self.df.index.get_loc(r.name)
+        previous_index = self.df.index[r_index - 1]
 
         property_equal_to_previous = (
             r.name == 0 or
@@ -39,20 +40,22 @@ class ListingsSubgrouper(object):
             self.current_subgroup = 1
             return self.current_subgroup
         else:
-            identicle_properties = np.logical_and.reduce(
+            identicle_and_before_current = np.logical_and.reduce(
                 np.array(list(
                     self.df[i] == x for (i, x) in
                     self.df.loc[r.name, self.property_columns].iteritems()
                 )),
-            axis=0)
+                axis=0
+            )
+            identicle_and_before_current[r_index:] = False
 
             max_last_encounted = self.df.loc[
-                identicle_properties,
+                identicle_and_before_current,
                 Unduplicator.LAST_ENCOUNTED
-            ].loc[
-                self.df.index[:self.df.index.get_loc(r.name)]
             ].max()
-            time_difference = r[Unduplicator.FIRST_ENCOUNTED] - max_last_encounted
+
+            time_difference = (
+                r[Unduplicator.FIRST_ENCOUNTED] - max_last_encounted)
             new_subgroup = time_difference > self.max_time_diff
 
             if new_subgroup:
