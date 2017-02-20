@@ -140,7 +140,7 @@ class RentalsXY(XY):
             (df['sale_type'] == 'Rental')
         )
 
-    def rental_data_qc_filter(self, df):
+    def price_qc_filter(self, df):
         return (
             (df['price_min'] > 2 * 10 ** 1) &
             (df['price_max'] > 2 * 10 ** 1)
