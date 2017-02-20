@@ -9,6 +9,7 @@ class DataAnalysis():
         data = DataAnalysis.read_data(data_file_path)
         xy = xy_class(data, exclude_suburb=False)
         DataAnalysis.data_summary(data, xy, outputs_dir)
+        xy.report_on_data_qc(data, outputs_dir)
 
     def read_data(data_file_path):
         return pd.read_hdf(data_file_path)

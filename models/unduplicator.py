@@ -18,51 +18,6 @@ class UnorderedDateEncountedError(DataValidationError):
 class UnorderedListingsError(DataValidationError):
     pass
 
-class ListingsSubgrouper(object):
-    def __init__(self, df, property_columns, max_time_diff):
-        self.current_subgroup = None
-        self.df = df
-        self.property_columns = property_columns
-        self.max_time_diff = max_time_diff
-
-    def group(self, r):
-        r_index = self.df.index.get_loc(r.name)
-        previous_index = self.df.index[r_index - 1]
-
-        property_equal_to_previous = (
-            r.name == 0 or
-            not r[self.property_columns].equals(
-                self.df.loc[previous_index, self.property_columns]
-            )
-        )
-
-        if property_equal_to_previous:
-            self.current_subgroup = 1
-            return self.current_subgroup
-        else:
-            identicle_and_before_current = np.logical_and.reduce(
-                np.array(list(
-                    self.df[i] == x for (i, x) in
-                    self.df.loc[r.name, self.property_columns].iteritems()
-                )),
-                axis=0
-            )
-            identicle_and_before_current[r_index:] = False
-
-            max_last_encounted = self.df.loc[
-                identicle_and_before_current,
-                Unduplicator.LAST_ENCOUNTED
-            ].max()
-
-            time_difference = (
-                r[Unduplicator.FIRST_ENCOUNTED] - max_last_encounted)
-            new_subgroup = time_difference > self.max_time_diff
-
-            if new_subgroup:
-                self.current_subgroup += 1
-            return self.current_subgroup
-
-
 class Unduplicator():
     '''Data Merger version 2.'''
 
@@ -213,3 +168,48 @@ class Unduplicator():
                 'Encounted dates failed the ordering check.\n' +
                 'Rows that failed the check:\n%s' % str(df[fe_gt_le])
             )
+
+class ListingsSubgrouper(object):
+    def __init__(self, df, property_columns, max_time_diff):
+        self.current_subgroup = None
+        self.df = df
+        self.property_columns = property_columns
+        self.max_time_diff = max_time_diff
+
+    def group(self, r):
+        r_index = self.df.index.get_loc(r.name)
+        previous_index = self.df.index[r_index - 1]
+
+        property_equal_to_previous = (
+            r.name == 0 or
+            not r[self.property_columns].equals(
+                self.df.loc[previous_index, self.property_columns]
+            )
+        )
+
+        if property_equal_to_previous:
+            self.current_subgroup = 1
+            return self.current_subgroup
+        else:
+            identicle_and_before_current = np.logical_and.reduce(
+                np.array(list(
+                    self.df[i] == x for (i, x) in
+                    self.df.loc[r.name, self.property_columns].iteritems()
+                )),
+                axis=0
+            )
+            identicle_and_before_current[r_index:] = False
+
+            max_last_encounted = self.df.loc[
+                identicle_and_before_current,
+                Unduplicator.LAST_ENCOUNTED
+            ].max()
+
+            time_difference = (
+                r[Unduplicator.FIRST_ENCOUNTED] - max_last_encounted
+            )
+            new_subgroup = time_difference > self.max_time_diff
+
+            if new_subgroup:
+                self.current_subgroup += 1
+            return self.current_subgroup
