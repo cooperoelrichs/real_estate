@@ -33,9 +33,10 @@ class ModelAnalysis():
         outputs_dir
     ):
         filtered_data = xy.filter_data(data)
-        results, model = ModelAnalysis.describe_model_estimations(
+        results, model, scores = ModelAnalysis.describe_model_estimations(
             xy, model_class,
-            outputs_dir + 'discription_of_model_estimations.html'
+            outputs_dir + 'discription_of_model_estimations.html',
+            filtered_data
         )
         ModelAnalysis.model_results_analysis(
             filtered_data, results, xy,
@@ -55,26 +56,29 @@ class ModelAnalysis():
             outputs_dir + 'model_accuracy_scatter_plot.png'
         )
 
-    def describe_model_estimations(xy, model_class, output_file):
-        model = model_class(xy.X.values, xy.y.values)
+        print('Model score: %.2f\n%s' % (scores.mean(), str(scores)))
+
+    def describe_model_estimations(xy, model_class, output_file, df):
+        model = model_class(xy)
+        scores = model.scores()
         estimates = model.predict()
+        y = xy.y()
         results = pd.DataFrame({
-            'actuals': xy.y,
+            'actuals': y,
             'estimates': estimates,
-            'error': estimates - xy.y
+            'error': estimates - y
         })
 
         DataAnalysis.save_df_as_html(results.describe(), output_file)
-        return results, model
+        return results, model, scores
 
     def model_results_analysis(filtered_data, results, xy, output_file):
         extended_results = pd.concat(
-            [filtered_data[[a for a, _ in xy.X_DATA]], results],
+            [filtered_data[[a for a, _ in xy.X_SPEC]], results],
             axis=1, ignore_index=False
         )
 
         DataAnalysis.save_df_as_html(extended_results, output_file)
-        print('Mean absolute error: %i' % results['error'].abs().mean())
 
     def save_model_coefs(model, xy, output_file):
         coefs = pd.DataFrame({
@@ -84,6 +88,7 @@ class ModelAnalysis():
         DataAnalysis.save_df_as_html(coefs, output_file)
 
     def violin_plot(filtered_data, output_file):
+        plt.figure()
         plot = sns.violinplot(
             x="property_type", y="price_max",
             data=filtered_data,
@@ -101,8 +106,8 @@ class ModelAnalysis():
         # identifiable coefficients.
         cols.remove('property_type_Not Specified')
 
-        x = xy.X[cols].copy()
-        x['price'] = xy.y
+        x = xy.X()[cols].copy()
+        x['price'] = xy.y()
         scatter_matrix(x, alpha=0.2, figsize=(20, 20), diagonal='kde')
         plt.savefig(output_file)
 

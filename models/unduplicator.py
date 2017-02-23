@@ -151,18 +151,25 @@ class Unduplicator():
         unbroken_last_encounteds = np.sort(
             df[~ df['sequence_broken']][Unduplicator.LAST_ENCOUNTED].unique()
         )
-        if len(unbroken_last_encounteds) != 1:
+
+        # unbroken_last_encounteds should unique to a single date.
+        if unbroken_last_encounteds.shape[0] != 1:
             damaged_rows = df[
-                df[Unduplicator.LAST_ENCOUNTED].isin(unbroken_last_encounteds[:-1]) &
+                df[Unduplicator.LAST_ENCOUNTED].isin(
+                    unbroken_last_encounteds[:-1]
+                ) &
                 ~ df['sequence_broken']
             ]
+
             raise UnbrokenListingsError(
                 'There are unbroken records for multiple dates.\n' +
                 'Broken rows:\n%s' % str(damaged_rows)
             )
 
     def check_ordering_of_encounted_dates(df):
-        fe_gt_le = df[Unduplicator.FIRST_ENCOUNTED] > df[Unduplicator.LAST_ENCOUNTED]
+        fe_gt_le = (
+            df[Unduplicator.FIRST_ENCOUNTED] > df[Unduplicator.LAST_ENCOUNTED]
+        )
         if fe_gt_le.any():
             raise UnorderedDateEncountedError(
                 'Encounted dates failed the ordering check.\n' +

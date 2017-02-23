@@ -6,10 +6,10 @@ from real_estate.models.unduplicator import Unduplicator
 class XY(object):
     """Generate X and y tensors from the properties DataFrame."""
 
-    X_DATA = [
-        ('bedrooms', 'continuous'),
-        ('bathrooms', 'continuous'),
-        ('garage_spaces', 'continuous'),
+    X_SPEC = [
+        ('bedrooms', 'categorical'),
+        ('bathrooms', 'categorical'),
+        ('garage_spaces', 'categorical'),
         ('property_type', 'categorical'),
         ('suburb', 'categorical')
     ]
@@ -24,8 +24,7 @@ class XY(object):
         if self.perform_merges:
             df = Unduplicator.check_and_unduplicate(df)
 
-        self.y = self.make_y(df)
-        self.X = self.make_x(df)
+        self.data = df
 
     def filter_data(self, df):
         df = self.invalid_data_filter(df)
@@ -72,11 +71,23 @@ class XY(object):
     def specific_qc_data_filter(self, df):
         return self.price_qc_filter(df)
 
+    def y(self):
+        return self.make_y(self.data)
+
+    def y_cv(self, i):
+        return self.make_y(self.data.loc[i])
+
+    def X(self):
+        return self.make_x(self.data)
+
+    def X_cv(self, i):
+        return self.make_x(self.data.loc[i])
+
     def make_y(self, df):
         return df[['price_min', 'price_max']].mean(axis=1)
 
     def make_x(self, df):
-        individualised_x_data = self.X_DATA
+        individualised_x_data = self.X_SPEC
         if self.exclude_suburb:
             individualised_x_data -= {('suburb', 'categorical')}
 
@@ -89,8 +100,24 @@ class XY(object):
         X.loc[X['property_type']=='Not Specified', 'property_type'] = np.NaN
 
         if not self.exclude_suburb:
-            littlest_suburb = X['suburb'].value_counts().sort_index().sort_values().index[0]
+            littlest_suburb = X[
+                'suburb'
+            ].value_counts(
+            ).sort_index(
+            ).sort_values(
+            ).index[0]
+
             X.loc[X['suburb']==littlest_suburb, 'suburb'] = np.NaN
+
+        # Bedrooms categorical test
+        X.loc[X['bedrooms']==1, 'bedrooms'] = np.NaN
+        X.loc[X['bedrooms'] > 6, 'bedrooms'] = 6
+
+        X.loc[X['bathrooms']==1, 'bathrooms'] = np.NaN
+        X.loc[X['bathrooms'] > 6, 'bathrooms'] = 6
+
+        X.loc[X['garage_spaces']==1, 'garage_spaces'] = np.NaN
+        X.loc[X['garage_spaces'] > 6, 'garage_spaces'] = 6
 
         X = pd.get_dummies(
             X, prefix=cats, prefix_sep='_', columns=cats,
