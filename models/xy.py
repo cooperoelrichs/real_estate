@@ -7,12 +7,21 @@ class XY(object):
     """Generate X and y tensors from the properties DataFrame."""
 
     X_SPEC = [
-        ('bedrooms', 'categorical'),
-        ('bathrooms', 'categorical'),
-        ('garage_spaces', 'categorical'),
+        ('bedrooms', 'ordinal'),
+        ('bathrooms', 'ordinal'),
+        ('garage_spaces', 'ordinal'),
         ('property_type', 'categorical'),
         ('suburb', 'categorical')
     ]
+
+    ORDINAL_EXCLUDE = 1
+    ORDINAL_MAX = 6
+
+    CATEGORICALS_EXCLUSIONS = {
+        'property_type': 'Not Specified',
+        'suburb': 'City'
+    }
+    EXCLUDE_SMALLEST_SUBURB = False
 
     VALID_SUBURBS_LIST = None  # Make this
 
@@ -24,7 +33,10 @@ class XY(object):
         if self.perform_merges:
             df = Unduplicator.check_and_unduplicate(df)
 
-        self.data = df
+        self.y = self.make_y(df)
+        self.X = self.make_x(df)
+
+        self.dummy_groups = self.make_dummy_groups(df)
 
     def filter_data(self, df):
         df = self.invalid_data_filter(df)
@@ -71,53 +83,20 @@ class XY(object):
     def specific_qc_data_filter(self, df):
         return self.price_qc_filter(df)
 
-    def y(self):
-        return self.make_y(self.data)
-
-    def y_cv(self, i):
-        return self.make_y(self.data.loc[i])
-
-    def X(self):
-        return self.make_x(self.data)
-
-    def X_cv(self, i):
-        return self.make_x(self.data.loc[i])
-
     def make_y(self, df):
         return df[['price_min', 'price_max']].mean(axis=1)
 
     def make_x(self, df):
-        individualised_x_data = self.X_SPEC
-        if self.exclude_suburb:
-            individualised_x_data -= {('suburb', 'categorical')}
+        x_spec = self.get_individualised_x_spec()
 
 
-        X = df[[a for a, _ in individualised_x_data]].copy()
-        cats = [a for a, b in individualised_x_data if b == 'categorical']
+        X = df[[a for a, _ in x_spec]].copy()
+        cats = [a for a, b in x_spec if b != 'continuous']
 
-        # Drop the 'Not Specified' property_type so that we have
-        # identifiable coefficients.
-        X.loc[X['property_type']=='Not Specified', 'property_type'] = np.NaN
-
-        if not self.exclude_suburb:
-            littlest_suburb = X[
-                'suburb'
-            ].value_counts(
-            ).sort_index(
-            ).sort_values(
-            ).index[0]
-
-            X.loc[X['suburb']==littlest_suburb, 'suburb'] = np.NaN
-
-        # Bedrooms categorical test
-        X.loc[X['bedrooms']==1, 'bedrooms'] = np.NaN
-        X.loc[X['bedrooms'] > 6, 'bedrooms'] = 6
-
-        X.loc[X['bathrooms']==1, 'bathrooms'] = np.NaN
-        X.loc[X['bathrooms'] > 6, 'bathrooms'] = 6
-
-        X.loc[X['garage_spaces']==1, 'garage_spaces'] = np.NaN
-        X.loc[X['garage_spaces'] > 6, 'garage_spaces'] = 6
+        for categorical in [a for a, b in x_spec if b == 'categorical']:
+            X = self.prep_categorical(categorical, X)
+        for ordinal in [a for a, b in x_spec if b == 'ordinal']:
+            X = self.prep_ordinal(ordinal, X)
 
         X = pd.get_dummies(
             X, prefix=cats, prefix_sep='_', columns=cats,
@@ -126,6 +105,71 @@ class XY(object):
 
         return X
 
+    def get_individualised_x_spec(self):
+        if self.exclude_suburb:
+            return self.X_SPEC - {('suburb', 'categorical')}
+        else:
+            return self.X_SPEC
+
+    def prep_categorical(self, categorical, X):
+        # Drop the 'Not Specified' property_type so that we have
+        # identifiable coefficients.
+        X.loc[
+            X[categorical] == self.CATEGORICALS_EXCLUSIONS[categorical],
+            categorical
+        ] = np.NaN
+
+        if (
+            categorical == 'suburb' and
+            self.EXCLUDE_SMALLEST_SUBURB and
+            not self.exclude_suburb
+        ):
+            X = self.exclude_smallest_suburb(X)
+        return X
+
+    def exclude_smallest_suburb(self, X):
+        smallest_suburb = X[
+            'suburb'
+        ].value_counts(
+        ).sort_index(
+        ).sort_values(
+        ).index[0]
+
+        X.loc[X['suburb'] == smallest_suburb, 'suburb'] = np.NaN
+        return X
+
+    def prep_ordinal(self, ordinal, X):
+        X.loc[X[ordinal] == self.ORDINAL_EXCLUDE, ordinal] = np.NaN
+        X.loc[X[ordinal] > self.ORDINAL_MAX, ordinal] = self.ORDINAL_MAX
+        return X
+
+    def make_dummy_groups(self, df):
+        x_spec = self.get_individualised_x_spec()
+        contins = [a for a, b in x_spec if b == 'continuous']
+        dummies = [(a, b) for a, b in x_spec if b != 'continuous']
+
+        indicies = []
+        current_pos = len(contins)
+
+        for dummy, spec in dummies:
+            uniques = df[dummy].unique()
+            if spec == 'ordinal':
+                uniques = uniques[
+                    (uniques != self.ORDINAL_EXCLUDE) &
+                    (uniques <= self.ORDINAL_MAX)
+                ]
+            if spec == 'categorical':
+                uniques = uniques[
+                    uniques != self.CATEGORICALS_EXCLUSIONS[dummy]
+                ]
+
+            num_uniques = uniques.shape[0]
+            indicies += [
+                (dummy, current_pos, current_pos + num_uniques)
+            ]
+            current_pos += num_uniques
+
+        return indicies
 
 class SalesXY(XY):
     def __init__(self, df, exclude_suburb=False, perform_merges=True):

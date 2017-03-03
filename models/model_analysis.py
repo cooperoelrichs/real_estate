@@ -59,14 +59,16 @@ class ModelAnalysis():
         print('Model score: %.2f\n%s' % (scores.mean(), str(scores)))
 
     def describe_model_estimations(xy, model_class, output_file, df):
-        model = model_class(xy)
+        model = model_class(
+            xy.X.values, xy.y.values, xy.X.columns.values, df,
+            xy.dummy_groups
+        )
         scores = model.scores()
         estimates = model.predict()
-        y = xy.y()
         results = pd.DataFrame({
-            'actuals': y,
+            'actuals': xy.y,
             'estimates': estimates,
-            'error': estimates - y
+            'error': estimates - xy.y
         })
 
         DataAnalysis.save_df_as_html(results.describe(), output_file)
@@ -106,8 +108,8 @@ class ModelAnalysis():
         # identifiable coefficients.
         cols.remove('property_type_Not Specified')
 
-        x = xy.X()[cols].copy()
-        x['price'] = xy.y()
+        x = xy.X[cols].copy()
+        x['price'] = xy.y
         scatter_matrix(x, alpha=0.2, figsize=(20, 20), diagonal='kde')
         plt.savefig(output_file)
 
