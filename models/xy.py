@@ -19,9 +19,9 @@ class XY(object):
 
     CATEGORICALS_EXCLUSIONS = {
         'property_type': 'Not Specified',
-        'suburb': 'City'
+        'suburb': 'city'
     }
-    EXCLUDE_SMALLEST_SUBURB = False
+    # EXCLUDE_SMALLEST_SUBURB = False
 
     VALID_SUBURBS_LIST = None  # Make this
 
@@ -93,10 +93,7 @@ class XY(object):
         X = df[[a for a, _ in x_spec]].copy()
         cats = [a for a, b in x_spec if b != 'continuous']
 
-        for categorical in [a for a, b in x_spec if b == 'categorical']:
-            X = self.prep_categorical(categorical, X)
-        for ordinal in [a for a, b in x_spec if b == 'ordinal']:
-            X = self.prep_ordinal(ordinal, X)
+        X = self.prep_work(X, x_spec)
 
         X = pd.get_dummies(
             X, prefix=cats, prefix_sep='_', columns=cats,
@@ -111,6 +108,13 @@ class XY(object):
         else:
             return self.X_SPEC
 
+    def prep_work(self, df, x_spec):
+        for categorical in [a for a, b in x_spec if b == 'categorical']:
+            df = self.prep_categorical(categorical, df)
+        for ordinal in [a for a, b in x_spec if b == 'ordinal']:
+            df = self.prep_ordinal(ordinal, df)
+        return df
+
     def prep_categorical(self, categorical, X):
         # Drop the 'Not Specified' property_type so that we have
         # identifiable coefficients.
@@ -119,24 +123,24 @@ class XY(object):
             categorical
         ] = np.NaN
 
-        if (
-            categorical == 'suburb' and
-            self.EXCLUDE_SMALLEST_SUBURB and
-            not self.exclude_suburb
-        ):
-            X = self.exclude_smallest_suburb(X)
+        # if (
+        #     categorical == 'suburb' and
+        #     self.EXCLUDE_SMALLEST_SUBURB and
+        #     not self.exclude_suburb
+        # ):
+        #     X = self.exclude_smallest_suburb(X)
         return X
 
-    def exclude_smallest_suburb(self, X):
-        smallest_suburb = X[
-            'suburb'
-        ].value_counts(
-        ).sort_index(
-        ).sort_values(
-        ).index[0]
-
-        X.loc[X['suburb'] == smallest_suburb, 'suburb'] = np.NaN
-        return X
+    # def exclude_smallest_suburb(self, X):
+    #     smallest_suburb = X[
+    #         'suburb'
+    #     ].value_counts(
+    #     ).sort_index(
+    #     ).sort_values(
+    #     ).index[0]
+    #
+    #     X.loc[X['suburb'] == smallest_suburb, 'suburb'] = np.NaN
+    #     return X
 
     def prep_ordinal(self, ordinal, X):
         X.loc[X[ordinal] == self.ORDINAL_EXCLUDE, ordinal] = np.NaN
@@ -145,31 +149,25 @@ class XY(object):
 
     def make_dummy_groups(self, df):
         x_spec = self.get_individualised_x_spec()
+        df = self.prep_work(df.copy(), x_spec)
+
         contins = [a for a, b in x_spec if b == 'continuous']
         dummies = [(a, b) for a, b in x_spec if b != 'continuous']
 
-        indicies = []
+        dummy_groups = []
         current_pos = len(contins)
 
         for dummy, spec in dummies:
             uniques = df[dummy].unique()
-            if spec == 'ordinal':
-                uniques = uniques[
-                    (uniques != self.ORDINAL_EXCLUDE) &
-                    (uniques <= self.ORDINAL_MAX)
-                ]
-            if spec == 'categorical':
-                uniques = uniques[
-                    uniques != self.CATEGORICALS_EXCLUSIONS[dummy]
-                ]
-
+            uniques = uniques[~pd.isnull(uniques)]
             num_uniques = uniques.shape[0]
-            indicies += [
+            dummy_groups += [
                 (dummy, current_pos, current_pos + num_uniques)
             ]
+
             current_pos += num_uniques
 
-        return indicies
+        return dummy_groups
 
 class SalesXY(XY):
     def __init__(self, df, exclude_suburb=False, perform_merges=True):

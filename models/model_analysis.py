@@ -56,7 +56,7 @@ class ModelAnalysis():
             outputs_dir + 'model_accuracy_scatter_plot.png'
         )
 
-        print('Model score: %.2f\n%s' % (scores.mean(), str(scores)))
+        print('Average model score: %.2f\n%s' % (scores.mean(), str(scores)))
 
     def describe_model_estimations(xy, model_class, output_file, df):
         model = model_class(

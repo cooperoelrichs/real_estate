@@ -25,7 +25,6 @@ class PriceModel(object):
             self.score(train_i, test_i)
             for train_i, test_i in KFold(n=self.X.shape[0], n_folds=10)
         ])
-
         return scores
 
     def score(self, train_i, test_i):
@@ -33,36 +32,9 @@ class PriceModel(object):
         self.model.fit(self.X[:, id_filter][train_i], self.y[train_i])
         score = self.model.score(self.X[:, id_filter][test_i], self.y[test_i])
 
-        # TESTING ===============================
-        if score < -10000:
-            print('>>>>>>>>>>>>>>>>>>>>>>')
-            print(self.dummy_groups)
-
-            j = 124
-            X_train = self.X[train_i, :j]
-            X_test = self.X[test_i, :j]
-
-            self.model.fit(X_train, self.y[train_i])
-            score = self.model.score(X_test, self.y[test_i])
-
-            print(score)
-
-            print('---')
-            print(self.X[train_i].shape)
-            print(X_train.shape)
-            print(self.X[train_i][:, id_filter].shape)
-
-            print('---')
-            print(self.X[train_i, 18:].shape)
-            print(self.X[train_i, 18:j].shape)
-            print(self.X[train_i][:, id_filter][:, 18:].shape)
-
-            print('---')
-            print((self.X[train_i, 18:].sum(axis=1) == 0).any())
-            print((self.X[train_i, 18:j].sum(axis=1) == 0).any())
-            print((self.X[train_i][:, id_filter].sum(axis=1) == 0).any())
-
-            exit()
+        # TODO This is only for testing, remove it.
+        if score < 0:
+            raise RuntimeError('Score is negative, model is probably broken')
 
         return score
 
@@ -70,13 +42,11 @@ class PriceModel(object):
         # Ensure that every dummy group excludes at least one category.
         # Ensure that no dummy columns are empty.
         dummies_filter = np.ones((X_subset.shape[1]), dtype=bool)
-        # empty_column_filter = X_subset.sum(axis=0) > 0
+        empty_column_filter = X_subset.sum(axis=0) > 0
 
         for name, i_first, i_last in self.dummy_groups:
             group_filter = np.zeros((X_subset.shape[1]), dtype=bool)
 
-            # TODO: Something is wrong with the indicies, 'i_last+1'
-            #       shouldn't work.
             group_filter[i_first:i_last+1] = True
             group_columns = X_subset[:, group_filter]  # & empty_column_filter]
 
@@ -84,7 +54,7 @@ class PriceModel(object):
             if not any_empty_rows:
                 dummies_filter[i_last - 1] = False
 
-        return dummies_filter  # & empty_column_filter
+        return dummies_filter & empty_column_filter
 
     def cv_predict(self):
         folds = KFold(
