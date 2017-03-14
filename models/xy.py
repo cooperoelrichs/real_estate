@@ -7,9 +7,9 @@ class XY(object):
     """Generate X and y tensors from the properties DataFrame."""
 
     X_SPEC = [
-        ('bedrooms', 'ordinal'),
-        ('bathrooms', 'ordinal'),
-        ('garage_spaces', 'ordinal'),
+        ('bedrooms', 'polynomial'),
+        ('bathrooms', 'polynomial'),
+        ('garage_spaces', 'polynomial'),
         ('property_type', 'categorical'),
         ('suburb', 'categorical')
     ]
@@ -91,7 +91,7 @@ class XY(object):
 
 
         X = df[[a for a, _ in x_spec]].copy()
-        cats = [a for a, b in x_spec if b != 'continuous']
+        cats = [a for a, b in x_spec if b == 'categorical' or b == 'ordinal']
 
         X = self.prep_work(X, x_spec)
 
@@ -113,6 +113,8 @@ class XY(object):
             df = self.prep_categorical(categorical, df)
         for ordinal in [a for a, b in x_spec if b == 'ordinal']:
             df = self.prep_ordinal(ordinal, df)
+        for polynomial in [a for a, b in x_spec if b == 'polynomial']:
+            df = self.prep_polynomial(polynomial, df)
         return df
 
     def prep_categorical(self, categorical, X):
@@ -147,16 +149,26 @@ class XY(object):
         X.loc[X[ordinal] > self.ORDINAL_MAX, ordinal] = self.ORDINAL_MAX
         return X
 
+    def prep_polynomial(self, polynomial, X):
+        X[polynomial + '_^2'] = X.loc[:, polynomial] ** 2
+        X[polynomial + '_^3'] = X.loc[:, polynomial] ** 3
+        return X
+
     def make_dummy_groups(self, df):
         x_spec = self.get_individualised_x_spec()
+        self.check_x_spec_ordering(x_spec)
+
         df = self.prep_work(df.copy(), x_spec)
 
         contins = [a for a, b in x_spec if b == 'continuous']
-        dummies = [(a, b) for a, b in x_spec if b != 'continuous']
+        polynos = [a for a, b in x_spec if b == 'polynomial']
+        dummies = [
+            (a, b) for a, b in x_spec
+            if b == 'categorical' or b == 'ordinal'
+        ]
 
+        current_pos = len(contins) + len(polynos) * 3
         dummy_groups = []
-        current_pos = len(contins)
-
         for dummy, spec in dummies:
             uniques = df[dummy].unique()
             uniques = uniques[~pd.isnull(uniques)]
@@ -168,6 +180,14 @@ class XY(object):
             current_pos += num_uniques
 
         return dummy_groups
+
+    def check_x_spec_ordering(self, x_spec):
+        p = False
+        for q in [b == 'categorical' for a, b in x_spec]:
+            if p and p != q:
+                raise RuntimeError('X_SPEC ordering is not correct')
+            p = q
+
 
 class SalesXY(XY):
     def __init__(self, df, exclude_suburb=False, perform_merges=True):

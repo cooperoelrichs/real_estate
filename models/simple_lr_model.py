@@ -34,7 +34,8 @@ class PriceModel(object):
 
         # TODO This is only for testing, remove it.
         if score < 0:
-            raise RuntimeError('Score is negative, model is probably broken')
+            print('Negative score: %f' % score)
+            # raise RuntimeError('Score is negative, model is probably broken')
 
         return score
 
