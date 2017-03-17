@@ -8,6 +8,7 @@ from pandas.tools.plotting import scatter_matrix
 from scipy.stats import gaussian_kde
 
 from real_estate.data_processing.data_analysis import DataAnalysis
+from real_estate.models.xy import XY
 
 
 class ModelAnalysis():
@@ -61,9 +62,11 @@ class ModelAnalysis():
     def describe_model_estimations(xy, model_class, output_file, df):
         model = model_class(
             xy.X.values, xy.y.values, xy.X.columns.values, df,
-            xy.dummy_groups
+            xy.categorical_groups, xy.by_categorical_groups
         )
         scores = model.scores()
+
+        model.fit()
         estimates = model.predict()
         results = pd.DataFrame({
             'actuals': xy.y,
@@ -76,10 +79,12 @@ class ModelAnalysis():
 
     def model_results_analysis(filtered_data, results, xy, output_file):
         extended_results = pd.concat(
-            [filtered_data[[a for a, _ in xy.X_SPEC]], results],
+            [filtered_data[XY.reduce_tuples([a for a, _ in xy.X_SPEC])], results],
             axis=1, ignore_index=False
         )
-
+        extended_results = extended_results.loc[
+            :, ~ extended_results.columns.duplicated('first')
+        ]
         DataAnalysis.save_df_as_html(extended_results, output_file)
 
     def save_model_coefs(model, xy, output_file):

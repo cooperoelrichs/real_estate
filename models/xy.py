@@ -7,19 +7,36 @@ class XY(object):
     """Generate X and y tensors from the properties DataFrame."""
 
     X_SPEC = [
-        ('bedrooms', 'polynomial'),
-        ('bathrooms', 'polynomial'),
-        ('garage_spaces', 'polynomial'),
-        ('property_type', 'categorical'),
-        ('suburb', 'categorical')
+        (('bedrooms',), 'polynomial'),
+        (('garage_spaces',), 'polynomial'),
+        (('bathrooms',), 'polynomial'),
+
+        (('bedrooms', 'property_type'), 'linear_by_categorical'),
+        (('bathrooms', 'property_type'), 'linear_by_categorical'),
+        (('garage_spaces', 'property_type'), 'linear_by_categorical'),
+
+        (('bathrooms', 'suburb'), 'linear_by_categorical'),
+        (('bedrooms', 'suburb'), 'linear_by_categorical'),
+        (('garage_spaces', 'suburb'), 'linear_by_categorical'),
+
+        # (('bedrooms',), 'categorical'),
+        # (('bathrooms',), 'categorical'),
+        # (('garage_spaces',), 'categorical'),
+
+        (('property_type',), 'categorical'),
+        (('suburb',), 'categorical')
     ]
 
     ORDINAL_EXCLUDE = 1
     ORDINAL_MAX = 6
+    POLYNOMIAL_DEGREE = 3
 
     CATEGORICALS_EXCLUSIONS = {
         'property_type': 'Not Specified',
-        'suburb': 'city'
+        'suburb': 'city',
+        'bedrooms': 0,
+        'bathrooms': 0,
+        'garage_spaces': 0,
     }
     # EXCLUDE_SMALLEST_SUBURB = False
 
@@ -36,7 +53,8 @@ class XY(object):
         self.y = self.make_y(df)
         self.X = self.make_x(df)
 
-        self.dummy_groups = self.make_dummy_groups(df)
+        self.categorical_groups = self.make_categorical_groups(df)
+        self.by_categorical_groups = self.make_by_categorical_groups(df)
 
     def filter_data(self, df):
         df = self.invalid_data_filter(df)
@@ -90,8 +108,12 @@ class XY(object):
         x_spec = self.get_individualised_x_spec()
 
 
-        X = df[[a for a, _ in x_spec]].copy()
-        cats = [a for a, b in x_spec if b == 'categorical' or b == 'ordinal']
+        X = df[XY.reduce_tuples(
+            [a for a, b in x_spec if b != 'linear_by_categorical']
+        )].copy()
+        cats = XY.reduce_tuples(
+            [a for a, b in x_spec if b == 'categorical' or b == 'ordinal']
+        )
 
         X = self.prep_work(X, x_spec)
 
@@ -110,11 +132,14 @@ class XY(object):
 
     def prep_work(self, df, x_spec):
         for categorical in [a for a, b in x_spec if b == 'categorical']:
-            df = self.prep_categorical(categorical, df)
+            df = self.prep_categorical(categorical[0], df)
         for ordinal in [a for a, b in x_spec if b == 'ordinal']:
-            df = self.prep_ordinal(ordinal, df)
+            df = self.prep_ordinal(ordinal[0], df)
         for polynomial in [a for a, b in x_spec if b == 'polynomial']:
-            df = self.prep_polynomial(polynomial, df)
+            df = self.prep_polynomial(polynomial[0], df)
+        for linear_by_categorical in [a for a, b in x_spec
+                                      if b == 'linear_by_categorical']:
+            df = self.prep_linear_by_categorical(linear_by_categorical, df)
         return df
 
     def prep_categorical(self, categorical, X):
@@ -150,36 +175,83 @@ class XY(object):
         return X
 
     def prep_polynomial(self, polynomial, X):
+        if self.POLYNOMIAL_DEGREE != 3:
+            raise ValueError('Only a POLYNOMIAL_DEGREE of 3 is supported.')
+
         X[polynomial + '_^2'] = X.loc[:, polynomial] ** 2
         X[polynomial + '_^3'] = X.loc[:, polynomial] ** 3
         return X
 
-    def make_dummy_groups(self, df):
+    def prep_linear_by_categorical(self, linear_by_categorical, X):
+        linear, categorical = linear_by_categorical
+        dummies = pd.get_dummies(
+            X[[categorical]], prefix=linear,
+            prefix_sep='_by_', columns=[categorical],
+            drop_first=False, dummy_na=False
+        )
+
+        X[dummies.columns] = dummies.multiply(X[linear], axis=0)
+        return X
+
+    def make_categorical_groups(self, df):
         x_spec = self.get_individualised_x_spec()
         self.check_x_spec_ordering(x_spec)
 
         df = self.prep_work(df.copy(), x_spec)
 
-        contins = [a for a, b in x_spec if b == 'continuous']
-        polynos = [a for a, b in x_spec if b == 'polynomial']
         dummies = [
-            (a, b) for a, b in x_spec
+            (a[0], b) for a, b in x_spec
             if b == 'categorical' or b == 'ordinal'
         ]
 
-        current_pos = len(contins) + len(polynos) * 3
-        dummy_groups = []
-        for dummy, spec in dummies:
-            uniques = df[dummy].unique()
-            uniques = uniques[~pd.isnull(uniques)]
-            num_uniques = uniques.shape[0]
-            dummy_groups += [
+        current_pos = self.calculate_position_of_first_dummy(x_spec, df)
+        categorical_groups = []
+        for dummy, _ in dummies:
+            num_uniques = XY.num_uniques(df[dummy])
+            categorical_groups += [
                 (dummy, current_pos, current_pos + num_uniques)
             ]
 
             current_pos += num_uniques
 
-        return dummy_groups
+        return categorical_groups
+
+    def make_by_categorical_groups(self, df):
+        x_spec = self.get_individualised_x_spec()
+        self.check_x_spec_ordering(x_spec)
+
+        contins = [a for a, b in x_spec if b == 'continuous']
+        polynos = [a for a, b in x_spec if b == 'polynomial']
+        pol_cat = [a for a, b in x_spec if b == 'linear_by_categorical']
+
+        current_pos = len(contins) + len(polynos) * self.POLYNOMIAL_DEGREE
+
+        df = self.prep_work(df.copy(), x_spec)
+        groups = []
+        for linear, categorical in pol_cat:
+            num_uniques = XY.num_uniques(df[categorical])
+            groups += [
+                (linear, categorical, current_pos, current_pos + num_uniques)
+            ]
+            current_pos += num_uniques
+        return groups
+
+    def calculate_position_of_first_dummy(self, x_spec, df):
+        contins = [a for a, b in x_spec if b == 'continuous']
+        polynos = [a for a, b in x_spec if b == 'polynomial']
+        pol_cat = [
+            (a, b) for a, b in x_spec
+            if b == 'linear_by_categorical'
+        ]
+
+        return (
+            len(contins) +
+            len(polynos) * self.POLYNOMIAL_DEGREE +
+            sum([XY.num_uniques(df[a[1]]) for a, _ in pol_cat]) - 1
+        )
+
+    def num_uniques(series):
+        return series.unique()[~pd.isnull(series.unique())].shape[0]
 
     def check_x_spec_ordering(self, x_spec):
         p = False
@@ -187,6 +259,9 @@ class XY(object):
             if p and p != q:
                 raise RuntimeError('X_SPEC ordering is not correct')
             p = q
+
+    def reduce_tuples(list_of_tuples):
+        return list(sum(list_of_tuples, ()))
 
 
 class SalesXY(XY):
