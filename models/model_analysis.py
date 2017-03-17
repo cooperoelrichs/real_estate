@@ -34,7 +34,7 @@ class ModelAnalysis():
         outputs_dir
     ):
         filtered_data = xy.filter_data(data)
-        results, model, scores = ModelAnalysis.describe_model_estimations(
+        results, model, scores, mean_error = ModelAnalysis.describe_model_estimations(
             xy, model_class,
             outputs_dir + 'discription_of_model_estimations.html',
             filtered_data
@@ -58,6 +58,7 @@ class ModelAnalysis():
         )
 
         print('Average model score: %.2f\n%s' % (scores.mean(), str(scores)))
+        print('Mean absolute error: %.2f' % mean_error)
 
     def describe_model_estimations(xy, model_class, output_file, df):
         model = model_class(
@@ -68,14 +69,16 @@ class ModelAnalysis():
 
         model.fit()
         estimates = model.predict()
+        mean_absolute_error = model.mean_absolute_error()
         results = pd.DataFrame({
             'actuals': xy.y,
             'estimates': estimates,
-            'error': estimates - xy.y
+            'error': estimates - xy.y,
+            'mean_error': mean_absolute_error,
         })
 
         DataAnalysis.save_df_as_html(results.describe(), output_file)
-        return results, model, scores
+        return results, model, scores, mean_absolute_error
 
     def model_results_analysis(filtered_data, results, xy, output_file):
         extended_results = pd.concat(

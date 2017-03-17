@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.cross_validation import (KFold, cross_val_score)
 from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.metrics import mean_absolute_error
 from real_estate.models.xy import XY
 
 
@@ -31,6 +32,9 @@ class PriceModel(object):
 
     def predict(self):
         return self.model.predict(self.X)
+
+    def mean_absolute_error(self):
+        return mean_absolute_error(y_true=self.y, y_pred=self.predict())
 
     def scores(self):
         scores = np.array([
