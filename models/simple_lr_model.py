@@ -3,6 +3,8 @@ import pandas as pd
 from sklearn.cross_validation import (KFold, cross_val_score)
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.metrics import mean_absolute_error
+
+import xgboost as xgb
 from real_estate.models.xy import XY
 
 
@@ -10,22 +12,17 @@ class PriceModel(object):
     N_FOLDS = 10
     MODEL_APLHA = 0.1
 
-    def __init__(self, X, y, X_labels, df,
-                 categorical_groups, by_categorical_groups):
-        self.model = Ridge(
-            alpha=self.MODEL_APLHA,
-            fit_intercept=True,
-            normalize=True,
-            copy_X=True,
-            # n_jobs=1
-        )
+    def __init__(self):
+        raise NotImplementedError()
+
+    def setup_self(self, X, y, X_labels, df):
         self.X = X
         self.y = y
         self.X_labels = X_labels
-        self.categorical_groups = categorical_groups
-        self.by_categorical_groups = by_categorical_groups
+        # self.categorical_groups = categorical_groups
+        # self.by_categorical_groups = by_categorical_groups
         self.df = df
-        self.seed = 1
+        # self.seed = 1
 
     def fit(self):
         self.model.fit(self.X, self.y)
@@ -101,3 +98,46 @@ class PriceModel(object):
 
     def cv_predict(self):
         raise NotImplementedError()
+
+
+class LinearModel(PriceModel):
+    def __init__(self, X, y, X_labels, df):
+        self.model = Ridge(
+            alpha=self.MODEL_APLHA,
+            fit_intercept=True,
+            normalize=True,
+            copy_X=True,
+            # n_jobs=1
+        )
+
+        self.setup_self(X, y, X_labels, df)
+
+
+class GBTrees(PriceModel):
+    HAS_SIMPLE_COEFS = False
+
+    def __init__(self, X, y, X_labels, df):
+        self.model = xgb.XGBRegressor(
+            max_depth=5,
+            learning_rate=0.05,
+            n_estimators=100,
+            silent=True,
+            objective='reg:linear',
+            nthread=-1,
+            gamma=2,
+            min_child_weight=10,
+            max_delta_step=1,
+            subsample=0.8,
+            colsample_bytree=0.5,
+            colsample_bylevel=1,
+            reg_alpha=1,
+            reg_lambda=1,
+            scale_pos_weight=1,
+            base_score=0.5,
+            seed=0,
+            missing=None
+        )
+        self.setup_self(X, y, X_labels, df)
+
+    def feature_importance(self):
+        return self.model.booster().get_fscore()

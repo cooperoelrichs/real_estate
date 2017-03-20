@@ -43,9 +43,16 @@ class ModelAnalysis():
             filtered_data, results, xy,
             outputs_dir + 'model_estimations.html'
         )
-        ModelAnalysis.save_model_coefs(
+
+        if model.HAS_SIMPLE_COEFS:
+            ModelAnalysis.save_model_coefs(
+                model, xy,
+                outputs_dir + 'model_coefficients.html'
+            )
+
+        ModelAnalysis.save_feature_importance(
             model, xy,
-            outputs_dir + 'model_coefficients.html'
+            outputs_dir + 'feature_importance.html'
         )
 
         ModelAnalysis.violin_plot(
@@ -57,13 +64,13 @@ class ModelAnalysis():
             outputs_dir + 'model_accuracy_scatter_plot.png'
         )
 
-        print('Average model score: %.2f\n%s' % (scores.mean(), str(scores)))
         print('Mean absolute error: %.2f' % mean_error)
+        print('Average model score: %.2f\n%s' % (scores.mean(), str(scores)))
 
     def describe_model_estimations(xy, model_class, output_file, df):
         model = model_class(
-            xy.X.values, xy.y.values, xy.X.columns.values, df,
-            xy.categorical_groups, xy.by_categorical_groups
+            xy.X.values, xy.y.values,
+            xy.X.columns.values, df,
         )
         scores = model.scores()
 
@@ -96,6 +103,21 @@ class ModelAnalysis():
             'value': [model.model.intercept_] + list(model.model.coef_)
         })
         DataAnalysis.save_df_as_html(coefs, output_file)
+
+    def save_feature_importance(model, xy, output_file):
+        feature_names = xy.X.columns.values
+        raw_feature_importance = model.feature_importance()
+
+        importance_values = [
+            raw_feature_importance.get('f%i' % x, np.nan)
+            for x in np.arange(feature_names.shape[0])
+        ]
+        feature_importance = pd.DataFrame({
+            'feature': list(feature_names),
+            'importance': importance_values
+        })
+
+        DataAnalysis.save_df_as_html(feature_importance, output_file)
 
     def violin_plot(filtered_data, output_file):
         plt.figure()
