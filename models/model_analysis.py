@@ -50,10 +50,11 @@ class ModelAnalysis():
                 outputs_dir + 'model_coefficients.html'
             )
 
-        ModelAnalysis.save_feature_importance(
-            model, xy,
-            outputs_dir + 'feature_importance.html'
-        )
+        if model.HAS_FEATURE_IMPORTANCE:
+            ModelAnalysis.save_feature_importance(
+                model, xy,
+                outputs_dir + 'feature_importance.html'
+            )
 
         ModelAnalysis.violin_plot(
             filtered_data, outputs_dir + 'violin_plot.png')

@@ -19,7 +19,7 @@ class GridSearch():
             scoring='mean_squared_error',
             cv=KFold(xy.y.values.shape[0]),
             verbose=0,
-            n_jobs=-1
+            n_jobs=4
         )
 
         grid.fit(xy.X.values, xy.y.values)
