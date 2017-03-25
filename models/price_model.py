@@ -22,11 +22,11 @@ class PriceModel(object):
     def fit(self):
         self.model.fit(self.X, self.y)
 
-    def predict(self):
-        return self.model.predict(self.X)
+    def predict(self, X_pred):
+        return self.model.predict(X_pred)
 
     def mean_absolute_error(self):
-        return mean_absolute_error(y_true=self.y, y_pred=self.predict())
+        return mean_absolute_error(y_true=self.y, y_pred=self.predict(self.X))
 
     def scores(self):
         scores = np.array([

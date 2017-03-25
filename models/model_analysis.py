@@ -76,7 +76,7 @@ class ModelAnalysis():
         scores = model.scores()
 
         model.fit()
-        estimates = model.predict()
+        estimates = model.predict(model.X)
         mean_absolute_error = model.mean_absolute_error()
         results = pd.DataFrame({
             'actuals': xy.y,

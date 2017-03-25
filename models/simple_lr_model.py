@@ -6,7 +6,7 @@ class LinearModel(PriceModel):
     HAS_SIMPLE_COEFS = True
     HAS_FEATURE_IMPORTANCE = False
 
-    def __init__(self, X, y, X_labels, df):
+    def __init__(self, X, y, X_labels, df=None):
         self.model = Ridge(
             alpha=self.MODEL_APLHA,
             fit_intercept=True,
