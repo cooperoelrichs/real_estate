@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import (Normalize, LinearSegmentedColormap)
@@ -21,7 +21,7 @@ LIGHT_GRAY = '#bcbcbc'
 GRAY = '#555555'
 
 PLOT_DPI = 500
-FIG_SIZE = (10, 10)
+FIG_SIZE = (5, 5)
 
 VALUE_BREAKES = {
     'House': [x * 10 ** 6 for x in (0.5, 0.6, 0.7, 0.8, 1, 1.5, 2)],
@@ -35,21 +35,22 @@ COLOURS = {
 
 
 class Choroplether():
-    def save_map(geo_df, bbox, outputs_dir,
+    def make_save_map(plot_thing, eo_df, bbox, outputs_dir,
                  suburb_values, img_title, prop_type):
-        plt.clf()
-
-        fig, ax = Choroplether.prep_plt()
+        fig, ax = Choroplether.prep_plt(plot_thing)
         basemap = Choroplether.make_a_basemap(bbox['ll_cnr'], bbox['ru_cnr'])
         Choroplether.make_map(
-            geo_df, bbox, suburb_values, img_title, prop_type, fig, ax, basemap
+            plot_thing, geo_df, bbox, suburb_values, img_title, prop_type,
+            fig, ax, basemap
         )
+        Choroplether.save_map(plot_thing, outputs_dir, img_title)
 
+    def save_map(plot_thing, outputs_dir, img_title):
         figure_file_name = outputs_dir + 'map-%s.png' % img_title
         print('Saving: %s' % figure_file_name)
-        plt.savefig(figure_file_name, dpi=PLOT_DPI, alpha=True)
+        plot_thing.savefig(figure_file_name, dpi=PLOT_DPI, alpha=True)
 
-    def make_map(geo_df, bbox, suburb_values, img_title, prop_type,
+    def make_map(plot_thing, geo_df, bbox, suburb_values, img_title, prop_type,
                  fig, ax, basemap):
         geo_df = Choroplether.add_poly_patches(geo_df, basemap)
         geo_df['estimated_value'] = Choroplether.prep_estimated_values(
@@ -57,36 +58,37 @@ class Choroplether():
         )
         breaks = Choroplether.make_breaks(geo_df, prop_type)
         geo_df = Choroplether.add_jenkins_bins(geo_df, breaks)
-        cmap = plt.get_cmap(COLOURS[prop_type])
+        cmap = plot_thing.get_cmap(COLOURS[prop_type])
 
         trans_ll_cnr = basemap(*bbox['ll_cnr'])
         trans_ru_cnr = basemap(*bbox['ru_cnr'])
 
         ax = Choroplether.add_patch_collections_to_ax(geo_df, ax, cmap)
-        Choroplether.add_a_colour_bar(breaks, geo_df, cmap, ax)
+        Choroplether.add_a_colour_bar(plot_thing, breaks, geo_df, cmap, ax)
 
         ax.set_xlim([trans_ll_cnr[0], trans_ru_cnr[0]])
         ax.set_ylim([trans_ll_cnr[1], trans_ru_cnr[1]])
         ax.xaxis.set_visible(False)
         ax.yaxis.set_visible(False)
 
-        plt.tight_layout()
-        fig.suptitle(img_title)
+        plot_thing.tight_layout()
+        # fig.suptitle(img_title, y=1)
+        return plot_thing, fig, ax
 
     def add_patch_collections_to_ax(geo_df, ax, cmap):
         norm = Normalize()
         cmap_values = cmap(norm(geo_df['jenks_bins'].values))
         cmap_values[:, 3] = POLYGON_ALPHA
 
-        for a in ('D', 'G'):
+        for a in ('G'):  # ('D', 'G')
             Choroplether.add_sub_collection(
                 ax, geo_df, geo_df['act_loca_5'] == a, cmap_values
             )
         return ax
 
-    def prep_plt():
-        fig = plt.figure(figsize=FIG_SIZE)
-        ax = plt.subplot('111', axisbg='w', frame_on=True)
+    def prep_plt(plot_thing):
+        fig = plot_thing.figure(figsize=FIG_SIZE)
+        ax = plot_thing.subplot('111', axisbg='w', frame_on=True)
         ax.set_aspect('equal')
         return fig, ax
 
@@ -128,7 +130,7 @@ class Choroplether():
             )
         )
 
-    def add_a_colour_bar(breaks, df, cmap, colourbar_ax):
+    def add_a_colour_bar(plot_thing, breaks, df, cmap, colourbar_ax):
         break_ranges_and_counts = zip(
             np.concatenate([[0], breaks.bins[0:-1]]),
             breaks.bins, breaks.counts
@@ -141,7 +143,7 @@ class Choroplether():
             0, 'Null\n%s suburb(s)' % len(df[df['estimated_value'].isnull()])
         )
         colour_bar = Choroplether.colorbar_index(
-            len(jenks_labels), cmap, jenks_labels, colourbar_ax
+            plot_thing, len(jenks_labels), cmap, jenks_labels, colourbar_ax
         )
         colour_bar.ax.tick_params(labelsize=6)
 
@@ -149,7 +151,7 @@ class Choroplether():
         r = ((ru[1] - ll[1]) / (ru[0] - ll[0]))
         return r
 
-    def make_a_basemap(ll_cnr, ru_cnr):
+    def make_a_basemap(ax, ll_cnr, ru_cnr):
         return Basemap(
             projection=EPSG_4283_APPROXIMATION['projection'],
             ellps=EPSG_4283_APPROXIMATION['ellps'],
@@ -161,8 +163,17 @@ class Choroplether():
             urcrnrlat=ru_cnr[1],
             lat_ts=0,
             resolution='i',
-            suppress_ticks=True
+            suppress_ticks=True,
+            ax=ax
         )
+        # return Basemap(
+        #     llcrnrlon=ll_cnr[0],
+        #     llcrnrlat=ll_cnr[1],
+        #     urcrnrlon=ru_cnr[0],
+        #     urcrnrlat=ru_cnr[1],
+        #     projection='merc',
+        #     ax=ax
+        # )
 
     def add_sub_collection(ax, df, df_filter, cmap_values):
         sub_df = df[df_filter]
@@ -170,7 +181,7 @@ class Choroplether():
         pc.set_facecolor(cmap_values[df_filter.values, :])
         ax.add_collection(pc)
 
-    def colorbar_index(ncolors, cmap, labels, colourbar_ax):
+    def colorbar_index(plot_thing, ncolors, cmap, labels, colourbar_ax):
         """
         Source:
         http://sensitivecities.com/so-youd-like-to-make-a-map-using-python-EN.html
@@ -179,7 +190,7 @@ class Choroplether():
         mappable = cm.ScalarMappable(cmap=cmap)
         mappable.set_array([])
         mappable.set_clim(-0.5, ncolors+0.5)
-        color_bar = plt.colorbar(
+        color_bar = plot_thing.colorbar(
             mappable,
             ax=colourbar_ax, drawedges=True,
             shrink=0.5, pad=0  # , alpha=POLYGON_ALPHA
