@@ -33,7 +33,7 @@ class XY(object):
 
     CATEGORICALS_EXCLUSIONS = {
         'property_type': 'Not Specified',
-        'suburb': 'city',
+        'suburb': 'not specified',  # 'city',
         'bedrooms': 0,
         'bathrooms': 0,
         'garage_spaces': 0,
