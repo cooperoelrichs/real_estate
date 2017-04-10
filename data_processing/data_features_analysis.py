@@ -14,16 +14,21 @@ class DataFeaturesAnalysis():
             DataFeaturesAnalysis.plots(df, feature_analysis_dir)
 
         def tables(df, feature_analysis_dir):
-            feature_groups = [
+            pivots = [
                 ('property_type', 'bedrooms'),
-                ('suburb', 'bedrooms')
+                ('suburb', 'bedrooms'),
+                ('suburb', 'property_type'),
             ]
-            DataFeaturesAnalysis.table_feature_groups(
-                feature_groups, df, feature_analysis_dir
+            DataFeaturesAnalysis.table_pivots(
+                pivots, df, feature_analysis_dir
             )
 
-        def table_feature_groups(groups, df, outputs_dir):
-            for a, b in groups:
+            DataFeaturesAnalysis.table_counts(
+                ['suburb'], df, feature_analysis_dir
+            )
+
+        def table_pivots(pivot_pairs, df, outputs_dir):
+            for a, b in pivot_pairs:
                 count_matrix = pd.pivot_table(
                     df.loc[:, (a, b)],
                     index=a, columns=b, aggfunc=len, fill_value=0
@@ -31,6 +36,15 @@ class DataFeaturesAnalysis():
                 name = DataFeaturesAnalysis.join_names((a, b))
                 file_path = outputs_dir + name + '.html'
                 DataAnalysis.save_df_as_html(count_matrix, file_path)
+
+        def table_counts(columns, df, outputs_dir):
+            for column in columns:
+                count = pd.DataFrame(
+                    df[column].value_counts(dropna=True),
+                    columns=[column]
+                )
+                file_path = outputs_dir + column + '_count' + '.html'
+                DataAnalysis.save_df_as_html(count, file_path)
 
         def plots(df, feature_analysis_dir):
             bar_feature_groups = [
