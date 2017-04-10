@@ -62,8 +62,8 @@ class Choroplether():
         trans_ll_cnr = basemap(*bbox['ll_cnr'])
         trans_ru_cnr = basemap(*bbox['ru_cnr'])
 
-        Choroplether.add_a_colour_bar(breaks, geo_df, cmap, ax)
         ax = Choroplether.add_patch_collections_to_ax(geo_df, ax, cmap)
+        Choroplether.add_a_colour_bar(breaks, geo_df, cmap, ax)
 
         ax.set_xlim([trans_ll_cnr[0], trans_ru_cnr[0]])
         ax.set_ylim([trans_ll_cnr[1], trans_ru_cnr[1]])
@@ -124,7 +124,7 @@ class Choroplether():
     def make_polygon_patches(shapes):
         return shapes.map(
             lambda x: PolygonPatch(
-                x, fc=LIGHT_GRAY, ec=GRAY, lw=0.4, alpha=0.5
+                x, fc=LIGHT_GRAY, ec=GRAY, lw=0.4  # , alpha=POLYGON_ALPHA
             )
         )
 
@@ -180,8 +180,9 @@ class Choroplether():
         mappable.set_array([])
         mappable.set_clim(-0.5, ncolors+0.5)
         color_bar = plt.colorbar(
-            mappable, ax=colourbar_ax, drawedges=True,
-            shrink=0.5, pad=0
+            mappable,
+            ax=colourbar_ax, drawedges=True,
+            shrink=0.5, pad=0  # , alpha=POLYGON_ALPHA
         )
 
         color_bar.set_ticks(np.linspace(0, ncolors, ncolors))
@@ -189,6 +190,9 @@ class Choroplether():
         color_bar.set_ticklabels(labels)
         color_bar.outline.set_edgecolor(GRAY)
         color_bar.outline.set_linewidth(1)
+
+        # color_bar.patch.set_facecolor((0, 0, 0, 1.0))
+        # color_bar.set_alpha(POLYGON_ALPHA)
         return color_bar
 
     def cmap_discretize(cmap, N):
@@ -199,16 +203,20 @@ class Choroplether():
         if type(cmap) == str:
             cmap = get_cmap(cmap)
         colors_i = np.concatenate((np.linspace(0, 1., N), (0., 0., 0., 0.)))
-        colors_rgba = cmap(colors_i)
+        rgba = cmap(colors_i)
         indices = np.linspace(0, 1., N + 1)
         cdict = {}
         for ki, key in enumerate(('red', 'green', 'blue')):
             cdict[key] = [
-                (indices[i], colors_rgba[i - 1, ki], colors_rgba[i, ki])
+                (
+                    indices[i],
+                    rgba[i - 1, ki] * POLYGON_ALPHA + (1 - POLYGON_ALPHA),
+                    rgba[i, ki] * POLYGON_ALPHA + (1 - POLYGON_ALPHA)
+                )
                 for i in range(N + 1)
             ]
 
-        cdict['alpha'] = [
-            (indices[i], POLYGON_ALPHA, POLYGON_ALPHA) for i in range(N + 1)
-        ]
+        # cdict['alpha'] = [
+        #     (indices[i], POLYGON_ALPHA, POLYGON_ALPHA) for i in range(N + 1)
+        # ]
         return LinearSegmentedColormap(cmap.name + "_%d" % N, cdict, 1024)
