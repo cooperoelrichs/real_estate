@@ -29,13 +29,16 @@ class DataFeaturesAnalysis():
 
         def table_pivots(pivot_pairs, df, outputs_dir):
             for a, b in pivot_pairs:
-                count_matrix = pd.pivot_table(
-                    df.loc[:, (a, b)],
-                    index=a, columns=b, aggfunc=len, fill_value=0
-                )
+                DataFeaturesAnalysis.pivot_table(a, b, df)
                 name = DataFeaturesAnalysis.join_names((a, b))
                 file_path = outputs_dir + name + '.html'
                 DataAnalysis.save_df_as_html(count_matrix, file_path)
+
+        def pivot_table(a, b, df):
+            return pd.pivot_table(
+                df.loc[:, (a, b)],
+                index=a, columns=b, aggfunc=len, fill_value=0
+            )
 
         def table_counts(columns, df, outputs_dir):
             for column in columns:
