@@ -24,21 +24,55 @@ class Choroplether():
     PLOT_DPI = 500
     NA_JENKINS_BIN = -1
 
-    HOUSE_BREAKES = [x * 10 ** 6 for x in (0.5, 0.6, 0.7, 0.8, 1, 1.5, 2, 3)]
-    UNIT_BREAKES = [x * 10 ** 6 for x in (0.2, 0.4, 0.4, 0.5, 0.6, 0.8, 1, 1.5)]
-    BASIC_BREAKES = [x * 10 ** 6 for x in (0.1, 0.3, 0.5, 0.75, 1, 2)]
+    DOLLAR_LABEL = '$ {:,.0f} - {:,.0f}\n{} suburb(s)'
+    COLOUR_BAR_LABELS = {
+        'sales': DOLLAR_LABEL,
+        'rentals': DOLLAR_LABEL,
+        'returns': '{:.3f} - {:.3f}\n{} suburb(s)',
+    }
 
-    VALUE_BREAKES = {
-        'House': HOUSE_BREAKES,
-        'Unit': UNIT_BREAKES,
+    SALES_HOUSE_BREAKES = [x * 10 ** 6 for x in (0.5, 0.6, 0.7, 0.8, 1, 1.5, 2, 3)]
+    SALES_UNIT_BREAKES = [x * 10 ** 6 for x in (0.2, 0.4, 0.4, 0.5, 0.6, 0.8, 1, 1.5)]
+    SALES_BASIC_BREAKES = [x * 10 ** 6 for x in (0.1, 0.3, 0.5, 0.75, 1, 2)]
+    SALES_VALUE_BREAKES = {
+        'House': SALES_HOUSE_BREAKES,
+        'Unit': SALES_UNIT_BREAKES,
 
-        'Town House': UNIT_BREAKES,
-        'Rural': HOUSE_BREAKES,
-        'Duplex': HOUSE_BREAKES,
-        'Retirement Living': BASIC_BREAKES,
-        'Studio': UNIT_BREAKES,
-        'Land': BASIC_BREAKES,
-        'Not Specified': BASIC_BREAKES,
+        'Town House': SALES_UNIT_BREAKES,
+        'Rural': SALES_HOUSE_BREAKES,
+        'Duplex': SALES_HOUSE_BREAKES,
+        'Retirement Living': SALES_BASIC_BREAKES,
+        'Studio': SALES_UNIT_BREAKES,
+        'Land': SALES_BASIC_BREAKES,
+        'Not Specified': SALES_BASIC_BREAKES,
+    }
+
+    RENTALS_HOUSE_BREAKES = [x * 10 ** 2 for x in (4.5, 5, 6, 7, 10, 12, 14, 6, 20, 50)]
+    RENTALS_UNIT_BREAKES = [x * 10 ** 2 for x in (3, 4, 5, 6, 7, 10, 15)]
+    RENTALS_BASIC_BREAKES = RENTALS_HOUSE_BREAKES
+    RENTALS_VALUE_BREAKES = {
+        'House': RENTALS_HOUSE_BREAKES,
+        'Unit': RENTALS_UNIT_BREAKES,
+
+        'Town House': RENTALS_UNIT_BREAKES,
+        'Rural': RENTALS_HOUSE_BREAKES,
+        'Duplex': RENTALS_HOUSE_BREAKES,
+        'Retirement Living': RENTALS_BASIC_BREAKES,
+        'Studio': RENTALS_UNIT_BREAKES,
+        'Land': RENTALS_BASIC_BREAKES,
+        'Not Specified': RENTALS_BASIC_BREAKES,
+    }
+
+    RETURNS_BREAKES = [0.03, 0.04, 0.045, 0.05, 0.055, 0.06, 0.07, 0.15]
+    RETURNS_VALUE_BREAKES = {
+        'House': RETURNS_BREAKES,
+        'Unit': RETURNS_BREAKES,
+    }
+
+    BREAKES = {
+        'sales': SALES_VALUE_BREAKES,
+        'rentals': RENTALS_VALUE_BREAKES,
+        'returns': RETURNS_VALUE_BREAKES
     }
 
     COLOURS = {
@@ -55,12 +89,13 @@ class Choroplether():
     }
 
     def make_save_map(plot_thing, eo_df, bbox, outputs_dir,
-                 suburb_values, img_title, prop_type, fig_size):
+                 suburb_values, img_title, prop_type, fig_size, value_breakes,
+                 model_type):
         fig, ax = Choroplether.prep_plt(plot_thing, fig_size)
         basemap = Choroplether.make_a_basemap(bbox['ll_cnr'], bbox['ru_cnr'])
         Choroplether.make_map(
             plot_thing, geo_df, bbox, suburb_values, img_title, prop_type,
-            fig, ax, basemap
+            fig, ax, basemap, value_breakes, model_type
         )
         Choroplether.save_map(plot_thing, outputs_dir, img_title)
 
@@ -72,25 +107,27 @@ class Choroplether():
         )
 
     def make_map(plot_thing, geo_df, bbox, suburb_values, img_title, prop_type,
-                 fig, ax, basemap):
+                 fig, ax, basemap, value_breakes, labels_str):
         Choroplether.plot_polygons(
-            plot_thing, geo_df, suburb_values, prop_type, ax, basemap
+            plot_thing, geo_df, suburb_values, prop_type, ax, basemap,
+            value_breakes, labels_str
         )
         Choroplether.format_plot(plot_thing, bbox, ax, basemap)
         return plot_thing, fig, ax
 
-    def plot_polygons(plot_thing, geo_df, suburb_values, prop_type, ax, basemap):
+    def plot_polygons(plot_thing, geo_df, suburb_values, prop_type,
+            ax, basemap, value_breakes, labels_str):
         geo_df = Choroplether.add_poly_patches(geo_df, basemap)
         geo_df['estimated_value'] = Choroplether.prep_estimated_values(
             geo_df, suburb_values
         )
-        breaks = Choroplether.make_breaks(geo_df, prop_type)
+        breaks = Choroplether.make_breaks(geo_df, prop_type, value_breakes)
         geo_df = Choroplether.add_jenkins_bins(geo_df, breaks)
         cmap = plot_thing.get_cmap(Choroplether.COLOURS[prop_type])
 
         poly_colours = Choroplether.generate_colours(geo_df, cmap, breaks)
         ax = Choroplether.add_patch_collections_to_ax(geo_df, ax, poly_colours)
-        Choroplether.add_a_colour_bar(plot_thing, breaks, geo_df, cmap, ax)
+        Choroplether.add_a_colour_bar(plot_thing, breaks, geo_df, cmap, ax, labels_str)
 
     def format_plot(plot_thing, bbox, ax, basemap):
         trans_ll_cnr = basemap(*bbox['ll_cnr'])
@@ -149,18 +186,23 @@ class Choroplether():
         return geo_df
 
     def prep_estimated_values(df, suburb_values):
-        suburbs_difference = np.setdiff1d(
-            df['name'].values, suburb_values.index.values
+        suburb_values = Choroplether.add_missing_data(
+            df['name'], suburb_values, np.nan
         )
-        for name in suburbs_difference:
-            suburb_values[name] = np.nan
-
         return [suburb_values[s] for s in df['name']]
 
-    def make_breaks(df, prop_type):
+    def add_missing_data(index, data, missing_value):
+        difference = np.setdiff1d(
+            index.values, data.index.values
+        )
+        for a in difference:
+            data[a] = missing_value
+        return data
+
+    def make_breaks(df, prop_type, value_breakes):
         return User_Defined(
             df[df['estimated_value'].notnull()]['estimated_value'].values,
-            Choroplether.VALUE_BREAKES[prop_type]
+            value_breakes[prop_type]
             # k=7
         )
 
@@ -178,13 +220,13 @@ class Choroplether():
             lambda x: PolygonPatch(x, fc=fc, ec=ec, lw=lw, alpha=alpha)
         )
 
-    def add_a_colour_bar(plot_thing, breaks, df, cmap, colourbar_ax):
+    def add_a_colour_bar(plot_thing, breaks, df, cmap, colourbar_ax, labels_str):
         break_ranges_and_counts = zip(
             np.concatenate([[0], breaks.bins[0:-1]]),
             breaks.bins, breaks.counts
         )
         jenks_labels = [
-            '$ {:,} - {:,}\n{} suburb(s)'.format(int(a), int(b), c)
+            labels_str.format(a, b, c)
             for a, b, c in break_ranges_and_counts
         ]
         jenks_labels.insert(
@@ -272,17 +314,28 @@ class Choroplether():
         # ]
         return LinearSegmentedColormap(cmap.name + "_%d" % N, cdict, 1024)
 
-    def label_polygons(geo_df_with_shapes, df_filter, ax, font_size):
-        geo_df_with_shapes[df_filter].apply(
+    def label_polygons(df, df_filter, ax, font_size, field):
+        Choroplether.annotate_polygons(
+            df, df_filter, ax, font_size, lambda x: x[field]
+        )
+
+    def label_polygons_with_counts(df, df_filter, ax, font_size, counts):
+        counts = Choroplether.add_missing_data(df['name'], counts, 0)
+        df['count'] = df.apply(lambda x: counts[x['name']], axis=1)
+        Choroplether.annotate_polygons(
+            df, df_filter, ax, font_size,
+            lambda x: '%s\n%0.0f' % (x['name'], x['count'])
+        )
+
+    def annotate_polygons(df, df_filter, ax, font_size, annotater):
+        df[df_filter].apply(
             lambda x: ax.annotate(
-                s=x['name'],
+                s=annotater(x),
                 xy=x['shape'].centroid.coords[0],
-                # xy=x['shape'].representative_point().coords[:],
                 ha='center',
-                # color='#555555',
+                va='center',
                 color='k',
-                fontsize=font_size,
-                # weight='bold'
+                fontsize=font_size
             ),
             axis=1
         )
