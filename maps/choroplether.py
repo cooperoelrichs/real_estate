@@ -31,9 +31,9 @@ class Choroplether():
         'returns': '{:.3f} - {:.3f}\n{} suburb(s)',
     }
 
-    SALES_HOUSE_BREAKES = [x * 10 ** 6 for x in (0.5, 0.6, 0.7, 0.8, 1, 1.5, 2, 3)]
-    SALES_UNIT_BREAKES = [x * 10 ** 6 for x in (0.2, 0.4, 0.4, 0.5, 0.6, 0.8, 1, 1.5)]
-    SALES_BASIC_BREAKES = [x * 10 ** 6 for x in (0.1, 0.3, 0.5, 0.75, 1, 2)]
+    SALES_HOUSE_BREAKES = [x * 10 ** 5 for x in (5, 6, 7, 8, 10, 15, 20, 35)]
+    SALES_UNIT_BREAKES = [x * 10 ** 5 for x in (2, 3, 4, 5, 6, 8, 10, 17.5)]
+    SALES_BASIC_BREAKES = [x * 10 ** 5 for x in (1, 3, 5, 7.5, 10, 20)]
     SALES_VALUE_BREAKES = {
         'House': SALES_HOUSE_BREAKES,
         'Unit': SALES_UNIT_BREAKES,
@@ -47,7 +47,9 @@ class Choroplether():
         'Not Specified': SALES_BASIC_BREAKES,
     }
 
-    RENTALS_HOUSE_BREAKES = [x * 10 ** 2 for x in (4.5, 5, 6, 7, 10, 12, 14, 6, 20, 50)]
+    RENTALS_HOUSE_BREAKES = [
+        x * 10 ** 2 for x in (4.5, 5, 6, 7, 10, 12, 14, 16, 20, 50)
+    ]
     RENTALS_UNIT_BREAKES = [x * 10 ** 2 for x in (3, 4, 5, 6, 7, 10, 15)]
     RENTALS_BASIC_BREAKES = RENTALS_HOUSE_BREAKES
     RENTALS_VALUE_BREAKES = {
@@ -63,7 +65,7 @@ class Choroplether():
         'Not Specified': RENTALS_BASIC_BREAKES,
     }
 
-    RETURNS_BREAKES = [0.03, 0.04, 0.045, 0.05, 0.055, 0.06, 0.07, 0.15]
+    RETURNS_BREAKES = [0.03, 0.04, 0.045, 0.05, 0.055, 0.06, 0.07, 0.15, 1]
     RETURNS_VALUE_BREAKES = {
         'House': RETURNS_BREAKES,
         'Unit': RETURNS_BREAKES,
@@ -127,7 +129,9 @@ class Choroplether():
 
         poly_colours = Choroplether.generate_colours(geo_df, cmap, breaks)
         ax = Choroplether.add_patch_collections_to_ax(geo_df, ax, poly_colours)
-        Choroplether.add_a_colour_bar(plot_thing, breaks, geo_df, cmap, ax, labels_str)
+        Choroplether.add_a_colour_bar(
+            plot_thing, breaks, geo_df, cmap, ax, labels_str
+        )
 
     def format_plot(plot_thing, bbox, ax, basemap):
         trans_ll_cnr = basemap(*bbox['ll_cnr'])
@@ -200,11 +204,21 @@ class Choroplether():
         return data
 
     def make_breaks(df, prop_type, value_breakes):
+        breakes_for_type = value_breakes[prop_type]
+        Choroplether.check_ordering_of_breakes(breakes_for_type)
         return User_Defined(
             df[df['estimated_value'].notnull()]['estimated_value'].values,
-            value_breakes[prop_type]
+            breakes_for_type
             # k=7
         )
+
+    def check_ordering_of_breakes(value_breakes):
+        if not value_breakes == sorted(value_breakes):
+            raise ValueError(
+                'breakes are not sorted in ascending order: %s' %
+                str(value_breakes)
+            )
+
 
     def make_default_polygon_patches(shapes):
         return Choroplether.make_polygon_patches(
@@ -232,6 +246,7 @@ class Choroplether():
         jenks_labels.insert(
             0, 'Null\n%s suburb(s)' % len(df[df['estimated_value'].isnull()])
         )
+
         colour_bar = Choroplether.colorbar_index(
             plot_thing, len(jenks_labels), cmap, jenks_labels, colourbar_ax
         )
