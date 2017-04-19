@@ -7,31 +7,45 @@ class Basemapper():
     PROVIDERS = {
         'carto-lite-no-labels': {
             'name': 'Carto Light - No Labels',
-            'attribution': "Map tiles by Carto, under CC BY 3.0. Data by OpenStreetMap, under ODbL.",
+            'attribution': "Map tiles by Carto, under CC BY 3.0.\nData by OpenStreetMap, under ODbL.",
             'url': "https://cartodb-basemaps-{subdomain}.global.ssl.fastly.net/light_nolabels/{z}/{x}/{y}.png",
             'subdomains': ['a', 'b', 'c']
         },
         'carto-lite': {
             'name': 'Carto Light',
-            'attribution': "Map tiles by Carto, under CC BY 3.0. Data by OpenStreetMap, under ODbL.",
+            'attribution': "Map tiles by Carto, under CC BY 3.0.\nData by OpenStreetMap, under ODbL.",
             'url': "https://cartodb-basemaps-{subdomain}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png",
             'subdomains': ['a', 'b', 'c']
         }
 
     }
 
-    def plot_default_on_map(bmap, bbox):
-        return Basemapper.plot_on_map(bmap, bbox, Basemapper.DEFAULT_PROVIDER)
+    def plot_default_on_map(ax, bmap, bbox):
+        return Basemapper.plot_on_map(
+            ax, bmap, bbox, Basemapper.DEFAULT_PROVIDER
+        )
 
-    def plot_on_map(bmap, bbox, provider):
-        img = Basemapper.dl_tiles(bbox, provider)
+    def plot_on_map(ax, bmap, bbox, provider_name):
+        img = Basemapper.dl_tiles(bbox, provider_name)
         bmap = Basemapper.add_img_to_basemap(bmap, img)
+        Basemapper.add_attribution(
+            ax, Basemapper.PROVIDERS[provider_name]['attribution']
+        )
         return bmap
-
 
     def add_img_to_basemap(bmap, img):
         bmap.imshow(img, interpolation='lanczos', origin='upper')
         return bmap
+
+    def add_attribution(ax, text):
+        ax.text(
+            0.99, 0.002,
+            text,
+            ha='right', va='bottom',
+            size=3.8,
+            color='#555555',
+            transform=ax.transAxes
+        )
 
     def dl_tiles(bbox, provider_name):
         bm_image = providerless_geotiler.MapPlus(
