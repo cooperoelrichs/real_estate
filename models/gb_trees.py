@@ -27,9 +27,9 @@ class GBTrees(PriceModel):
         'missing': None
     }
 
-    def __init__(self, X, y, X_labels, df):
+    def __init__(self, X, y, X_labels):
         self.model = GBTrees.make_model(self.PARAMS)
-        self.setup_self(X, y, X_labels, df)
+        self.setup_self(X, y, X_labels)
 
     def make_model(params):
         return xgb.XGBRegressor(**params)

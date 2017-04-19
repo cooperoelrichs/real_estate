@@ -10,13 +10,13 @@ class PriceModel(object):
     def __init__(self):
         raise NotImplementedError()
 
-    def setup_self(self, X, y, X_labels, df):
+    def setup_self(self, X, y, X_labels):
         self.X = X
         self.y = y
         self.X_labels = X_labels
         # self.categorical_groups = categorical_groups
         # self.by_categorical_groups = by_categorical_groups
-        self.df = df
+        # self.df = df
         # self.seed = 1
 
     def fit(self):
