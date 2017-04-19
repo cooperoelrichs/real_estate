@@ -8,7 +8,8 @@ from mpl_toolkits.basemap import Basemap
 from shapely.geometry import shape
 from shapely.ops import transform
 from descartes import PolygonPatch
-from pysal.esda.mapclassify import (Natural_Breaks, User_Defined)
+# from pysal.esda.mapclassify import (Natural_Breaks, User_Defined)
+from user_defined_with_minimum import User_Defined_With_Minimum
 
 
 class Choroplether():
@@ -31,7 +32,7 @@ class Choroplether():
         'returns': '{:.3f} - {:.3f}\n{} suburb(s)',
     }
 
-    SALES_HOUSE_BREAKES = [x * 10 ** 5 for x in (5, 6, 7, 8, 10, 15, 20, 35)]
+    SALES_HOUSE_BREAKES = [x * 10 ** 5 for x in (2, 6, 7, 8, 10, 15, 20, 35)]
     SALES_UNIT_BREAKES = [x * 10 ** 5 for x in (2, 3, 4, 5, 6, 8, 10, 17.5)]
     SALES_BASIC_BREAKES = [x * 10 ** 5 for x in (1, 3, 5, 7.5, 10, 20)]
     SALES_VALUE_BREAKES = {
@@ -48,7 +49,7 @@ class Choroplether():
     }
 
     RENTALS_HOUSE_BREAKES = [
-        x * 10 ** 2 for x in (4.5, 5, 6, 7, 10, 12, 14, 16, 20, 50)
+        x * 10 ** 2 for x in (4, 5, 6, 7, 10, 12, 14, 16, 20, 50)
     ]
     RENTALS_UNIT_BREAKES = [x * 10 ** 2 for x in (3, 4, 5, 6, 7, 10, 15)]
     RENTALS_BASIC_BREAKES = RENTALS_HOUSE_BREAKES
@@ -65,7 +66,7 @@ class Choroplether():
         'Not Specified': RENTALS_BASIC_BREAKES,
     }
 
-    RETURNS_BREAKES = [0.03, 0.04, 0.045, 0.05, 0.055, 0.06, 0.07, 0.15, 1]
+    RETURNS_BREAKES = [0.01, 0.04, 0.045, 0.05, 0.055, 0.06, 0.07, 0.15, 1]
     RETURNS_VALUE_BREAKES = {
         'House': RETURNS_BREAKES,
         'Unit': RETURNS_BREAKES,
@@ -206,7 +207,7 @@ class Choroplether():
     def make_breaks(df, prop_type, value_breakes):
         breakes_for_type = value_breakes[prop_type]
         Choroplether.check_ordering_of_breakes(breakes_for_type)
-        return User_Defined(
+        return User_Defined_With_Minimum(
             df[df['estimated_value'].notnull()]['estimated_value'].values,
             breakes_for_type
             # k=7
@@ -236,7 +237,7 @@ class Choroplether():
 
     def add_a_colour_bar(plot_thing, breaks, df, cmap, colourbar_ax, labels_str):
         break_ranges_and_counts = zip(
-            np.concatenate([[0], breaks.bins[0:-1]]),
+            np.concatenate([[breaks.lower_bound], breaks.bins[0:-1]]),
             breaks.bins, breaks.counts
         )
         jenks_labels = [
@@ -244,7 +245,8 @@ class Choroplether():
             for a, b, c in break_ranges_and_counts
         ]
         jenks_labels.insert(
-            0, 'Null\n%s suburb(s)' % len(df[df['estimated_value'].isnull()])
+            0,
+            'No Data\n%s suburb(s)' % len(df[df['estimated_value'].isnull()])
         )
 
         colour_bar = Choroplether.colorbar_index(
