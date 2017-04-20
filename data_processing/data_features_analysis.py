@@ -29,7 +29,7 @@ class DataFeaturesAnalysis():
 
         def table_pivots(pivot_pairs, df, outputs_dir):
             for a, b in pivot_pairs:
-                DataFeaturesAnalysis.pivot_table(a, b, df)
+                count_matrix = DataFeaturesAnalysis.pivot_table(a, b, df)
                 name = DataFeaturesAnalysis.join_names((a, b))
                 file_path = outputs_dir + name + '.html'
                 DataAnalysis.save_df_as_html(count_matrix, file_path)

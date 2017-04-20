@@ -71,7 +71,7 @@ class ModelAnalysis():
     def describe_model_estimations(xy, model_class, output_file, df):
         model = model_class(
             xy.X.values, xy.y.values,
-            xy.X.columns.values, df,
+            xy.X.columns.values
         )
         scores = model.scores()
 
