@@ -42,7 +42,7 @@ class Basemapper():
             0.99, 0.002,
             text,
             ha='right', va='bottom',
-            size=3.8,
+            size=4.5,
             color='#555555',
             transform=ax.transAxes
         )

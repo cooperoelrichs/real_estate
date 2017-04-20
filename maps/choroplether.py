@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.cm as cm
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import (Normalize, LinearSegmentedColormap)
+from matplotlib import patheffects
 from mpl_toolkits.basemap import Basemap
 from shapely.geometry import shape
 from shapely.ops import transform
@@ -32,8 +33,8 @@ class Choroplether():
         'returns': '{:.3f} - {:.3f}\n{} suburb(s)',
     }
 
-    SALES_HOUSE_BREAKES = [x * 10 ** 5 for x in (2, 6, 7, 8, 10, 15, 20, 35)]
-    SALES_UNIT_BREAKES = [x * 10 ** 5 for x in (2, 3, 4, 5, 6, 8, 10, 17.5)]
+    SALES_HOUSE_BREAKES = [x * 10 ** 5 for x in (2, 4, 6, 7, 8, 10, 15, 35)]
+    SALES_UNIT_BREAKES = [x * 10 ** 5 for x in (0.3, 2, 3, 4, 5, 6, 8, 17.5)]
     SALES_BASIC_BREAKES = [x * 10 ** 5 for x in (1, 3, 5, 7.5, 10, 20)]
     SALES_VALUE_BREAKES = {
         'House': SALES_HOUSE_BREAKES,
@@ -49,9 +50,9 @@ class Choroplether():
     }
 
     RENTALS_HOUSE_BREAKES = [
-        x * 10 ** 2 for x in (4, 5, 6, 7, 10, 12, 14, 16, 20, 50)
+        x * 10 ** 2 for x in (4, 5, 6, 7, 10, 12, 14, 20, 50)
     ]
-    RENTALS_UNIT_BREAKES = [x * 10 ** 2 for x in (3, 4, 5, 6, 7, 10, 15)]
+    RENTALS_UNIT_BREAKES = [x * 10 ** 2 for x in (2.5, 4, 5, 6, 7, 10, 15)]
     RENTALS_BASIC_BREAKES = RENTALS_HOUSE_BREAKES
     RENTALS_VALUE_BREAKES = {
         'House': RENTALS_HOUSE_BREAKES,
@@ -66,7 +67,7 @@ class Choroplether():
         'Not Specified': RENTALS_BASIC_BREAKES,
     }
 
-    RETURNS_BREAKES = [0.01, 0.04, 0.045, 0.05, 0.055, 0.06, 0.07, 0.15, 1]
+    RETURNS_BREAKES = [0.01, 0.03, 0.04, 0.045, 0.05, 0.055, 0.06, 0.07, 1]
     RETURNS_VALUE_BREAKES = {
         'House': RETURNS_BREAKES,
         'Unit': RETURNS_BREAKES,
@@ -351,8 +352,11 @@ class Choroplether():
                 xy=x['shape'].centroid.coords[0],
                 ha='center',
                 va='center',
-                color='k',
-                fontsize=font_size
+                color=Choroplether.GREY,
+                fontsize=font_size,
+                path_effects=[
+                    patheffects.withStroke(linewidth=1, foreground="w")
+                ]
             ),
             axis=1
         )
