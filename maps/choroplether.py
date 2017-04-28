@@ -107,7 +107,9 @@ class Choroplether():
         figure_file_name = outputs_dir + 'map-%s.png' % img_title
         print('Saving: %s' % figure_file_name)
         plot_thing.savefig(
-            figure_file_name, dpi=Choroplether.PLOT_DPI, alpha=True
+            figure_file_name, dpi=Choroplether.PLOT_DPI, alpha=True,
+            # transparent=True,
+            bbox_inches='tight', pad_inches=0
         )
 
     def make_map(plot_thing, geo_df, bbox, suburb_values, img_title, prop_type,
@@ -142,7 +144,7 @@ class Choroplether():
         ax.set_ylim([trans_ll_cnr[1], trans_ru_cnr[1]])
         ax.xaxis.set_visible(False)
         ax.yaxis.set_visible(False)
-        plot_thing.tight_layout()
+        # plot_thing.tight_layout(pad=0)  # , h_pad=0, w_pad=0)
 
     def generate_colours(geo_df, cmap, breaks):
         norm = Normalize(vmin=Choroplether.NA_JENKINS_BIN, vmax=(breaks.k - 1))
@@ -168,7 +170,7 @@ class Choroplether():
 
     def prep_plt(plot_thing, fig_size):
         fig = plot_thing.figure(figsize=fig_size)
-        ax = plot_thing.subplot('111', axisbg='w', frame_on=True)
+        ax = plot_thing.subplot('111', axisbg='w', frame_on=False)
         ax.set_aspect('equal')
         return fig, ax
 
@@ -291,7 +293,7 @@ class Choroplether():
             drawedges=True,
             shrink=0.5,
             aspect=40,
-            pad=0
+            pad=0.01
         )
 
         color_bar.set_ticks(np.linspace(0, ncolors, ncolors))
