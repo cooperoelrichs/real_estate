@@ -24,7 +24,7 @@ class DataFeaturesAnalysis():
             )
 
             DataFeaturesAnalysis.table_counts(
-                ['suburb'], df, feature_analysis_dir
+                ['suburb', 'property_type'], df, feature_analysis_dir
             )
 
         def table_pivots(pivot_pairs, df, outputs_dir):
