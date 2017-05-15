@@ -30,12 +30,12 @@ class Choroplether():
     COLOUR_BAR_LABELS = {
         'sales': DOLLAR_LABEL,
         'rentals': DOLLAR_LABEL,
-        'returns': '{:.3f} - {:.3f}\n{} suburb(s)',
+        'yields': '{:.3f} - {:.3f}\n{} suburb(s)',
     }
 
-    SALES_HOUSE_BREAKES = [x * 10 ** 5 for x in (2, 4, 6, 7, 8, 10, 15, 35)]
-    SALES_UNIT_BREAKES = [x * 10 ** 5 for x in (0.3, 2, 3, 4, 5, 6, 8, 17.5)]
-    SALES_BASIC_BREAKES = [x * 10 ** 5 for x in (1, 3, 5, 7.5, 10, 20)]
+    SALES_HOUSE_BREAKES = [x * 10 ** 5 for x in (2, 4, 6, 7, 8, 10, 15)]
+    SALES_UNIT_BREAKES = [x * 10 ** 5 for x in (0, 2, 3, 4, 5, 6, 8)]
+    SALES_BASIC_BREAKES = SALES_HOUSE_BREAKES
     SALES_VALUE_BREAKES = {
         'House': SALES_HOUSE_BREAKES,
         'Unit': SALES_UNIT_BREAKES,
@@ -49,10 +49,8 @@ class Choroplether():
         'Not Specified': SALES_BASIC_BREAKES,
     }
 
-    RENTALS_HOUSE_BREAKES = [
-        x * 10 ** 2 for x in (4, 5, 6, 7, 10, 12, 14, 20, 50)
-    ]
-    RENTALS_UNIT_BREAKES = [x * 10 ** 2 for x in (2.5, 4, 5, 6, 7, 10, 15)]
+    RENTALS_HOUSE_BREAKES = [x * 10 ** 2 for x in (4, 5, 6, 7, 8, 10, 12)]
+    RENTALS_UNIT_BREAKES = [x * 10 ** 2 for x in (2.5, 3, 4, 5, 6, 8, 10)]
     RENTALS_BASIC_BREAKES = RENTALS_HOUSE_BREAKES
     RENTALS_VALUE_BREAKES = {
         'House': RENTALS_HOUSE_BREAKES,
@@ -67,16 +65,16 @@ class Choroplether():
         'Not Specified': RENTALS_BASIC_BREAKES,
     }
 
-    RETURNS_BREAKES = [0.01, 0.03, 0.04, 0.045, 0.05, 0.055, 0.06, 0.07, 1]
-    RETURNS_VALUE_BREAKES = {
-        'House': RETURNS_BREAKES,
-        'Unit': RETURNS_BREAKES,
+    YIELDS_BREAKES = [0.01, 0.03, 0.04, 0.045, 0.05, 0.055, 0.06, 0.07, 1]
+    YIELDS_VALUE_BREAKES = {
+        'House': YIELDS_BREAKES,
+        'Unit': YIELDS_BREAKES,
     }
 
     BREAKES = {
         'sales': SALES_VALUE_BREAKES,
         'rentals': RENTALS_VALUE_BREAKES,
-        'returns': RETURNS_VALUE_BREAKES
+        'yields': YIELDS_VALUE_BREAKES
     }
 
     COLOURS = {
