@@ -26,8 +26,15 @@ class WebsiteScraper():
         DataStorer.create_new_unless_exists(df, file_path)
         DataStorer.update_data_store(df, file_path)
 
+    def retrieve_and_json_pages_by_postcodes(url_manager, file_path, pcs):
+        soups = WebsiteScraper.retrieve_all_pages_for_postcodes(url_manager, pcs)
+        WebsiteScraper.dump_soups(soups, file_path)
+
     def retrieve_and_json_all_pages(url_manager, file_path):
         soups = WebsiteScraper.retrieve_all_pages(url_manager)
+        WebsiteScraper.dump_soups(soups, file_path)
+
+    def dump_soups(soups, file_path):
         htmls = [str(soup) for soup in soups]
         JSONLoadAndDump.dump_to_file(htmls, file_path)
 
@@ -42,6 +49,27 @@ class WebsiteScraper():
         WebsiteScraper.log_failures(invalids, log_file_path)
         return valids, invalids
 
+    def retrieve_all_pages_for_postcodes(url_manager, pcs):
+        soups = []
+        for pc, state in pcs:
+            soups += WebsiteScraper.retrieve_soups_for_postcode(
+                url_manager, pc, state
+            )
+        return soups
+
+    def retrieve_soups_for_postcode(url_manager, pc, state):
+        soups = []
+        for i in range(url_manager.maximum_page_number):
+            page_num = i + 1
+            print('Retrieving page %i for %i in %s' % (page_num, pc, state))
+            url = url_manager.make_url_for_page_and_postcode(page_num, pc, state)
+            soup = WebsiteScraper.retrieve_soup_for_a_single_page(url)
+
+            if PageScraper.no_results_check(soup, page_num):
+                return soups
+            else:
+                soups.append(soup)
+
     def retrieve_all_pages(url_manager):
         soups = []
         for i in range(url_manager.maximum_page_number):
@@ -50,10 +78,7 @@ class WebsiteScraper():
             url = url_manager.make_url_for_page(page_num)
             soup = WebsiteScraper.retrieve_soup_for_a_single_page(url)
 
-            no_results = PageScraper.check_for_no_results(soup)
-            if no_results:
-                print("Found the 'no results' page, final page is number %i" %
-                      (page_num - 1))
+            if PageScraper.no_results_check(soup, page_num):
                 return soups
             else:
                 soups.append(soup)
