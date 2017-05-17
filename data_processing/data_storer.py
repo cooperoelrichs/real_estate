@@ -5,19 +5,21 @@ import datetime
 
 
 class DataStorer():
+    NEW_COLUMNS = ('address_text',)
+
     def create_new_unless_exists(df, file_path):
         if os.path.isfile(file_path):
             pass
         else:
             print('Data file did not exist, creating it: %s' % file_path)
             df = df.copy()
-            df = DataStorer.reformat_new_data(df)
+            df = DataStorer.reformat_dataframe(df)
             DataStorer.to_hdf(df, file_path)
 
     def update_data_store(new_data, file_path):
         new_data = new_data.copy()
         current_data = pd.read_hdf(file_path)
-        current_data = DataStorer.maybe_reformat_data(current_data)
+        current_data = DataStorer.maybe_apply_data_fixes(current_data)
 
         updated_data = DataStorer.update_data(current_data, new_data)
         DataStorer.to_hdf(updated_data, file_path)
@@ -36,14 +38,9 @@ class DataStorer():
 
     def merge_unbrokens(current_data, new_data):
         id_columns = DataStorer.get_id_columns(new_data)
-
-        unbrokens = current_data[
-            DataStorer.sequence_unbroken_filter(current_data)
-        ]
+        unbrokens = current_data[DataStorer.sequence_unbroken_filter(current_data)]
         unbrokens = pd.merge(unbrokens, new_data, how='inner', on=id_columns)
-        unbrokens = unbrokens[
-            unbrokens['date_scraped'] >= unbrokens['last_encounted']
-        ]
+        unbrokens = unbrokens[unbrokens['date_scraped'] >= unbrokens['last_encounted']]
         return unbrokens
 
     def sequence_unbroken_filter(data):
@@ -125,11 +122,22 @@ class DataStorer():
         if new_uniques.empty:
             return current_data
         else:
-            new_uniques = DataStorer.reformat_new_data(new_uniques)
+            new_uniques = DataStorer.reformat_dataframe(new_uniques)
             updated_data = current_data.append(
                 new_uniques, ignore_index=True, verify_integrity=True
             )
             return updated_data
+
+    def maybe_apply_data_fixes(df):
+        df = DataStorer.maybe_add_missing_columns(df)
+        df = DataStorer.maybe_reformat_data(df)
+        return df
+
+    def maybe_add_missing_columns(df):
+        for x in DataStorer.NEW_COLUMNS:
+            if x not in df.columns:
+                df[x] = None
+        return df
 
     def maybe_reformat_data(df):
         if ('first_encounted' in df.columns and
@@ -140,18 +148,18 @@ class DataStorer():
                 not 'last_encounted' in df.columns and
                 not 'sequence_broken' in df.columns and
                 'date_scraped' in df.columns):
-            return DataStorer.reformat_new_data(df)
+            return DataStorer.reformat_dataframe(df)
         elif (not 'first_encounted' in df.columns and
                 not 'last_encounted' in df.columns and
                 not 'sequence_broken' in df.columns and
                 'datetime' in df.columns):
             df.loc[:, 'date_scraped'] = df.loc[:, 'datetime']
             df = df.drop('datetime', 1)
-            return DataStorer.reformat_new_data(df)
+            return DataStorer.reformat_dataframe(df)
         else:
             raise RuntimeError('Invalid df: %s' % str(df.columns))
 
-    def reformat_new_data(new_df):
+    def reformat_dataframe(new_df):
         new_df.loc[:, 'first_encounted'] = new_df['date_scraped']
         new_df.loc[:, 'last_encounted'] = new_df['date_scraped']
         new_df.loc[:, 'sequence_broken'] = False

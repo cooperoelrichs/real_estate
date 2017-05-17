@@ -9,7 +9,8 @@ class Settings(object):
         self.verbosity = verbosity
 
         json_settings = JSONLoadAndDump.load_from_file(
-            settings_file_path)[run_type]
+            settings_file_path
+        )[run_type]
 
         data_dir = os.path.join(run_dir, json_settings['data_dir'])
         html_dir = os.path.join(run_dir, json_settings['html_dir'])

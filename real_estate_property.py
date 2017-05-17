@@ -21,10 +21,10 @@ class ObjectWithDictEquality(object):
 
 
 class Property(ObjectWithDictEquality):
-    def __init__(self, sale_type, details, address):
+    def __init__(self, sale_type, details, address_text):
         self.sale_type = sale_type
         self.details = details
-        self.address = address
+        self.address_text = address_text
 
         self.self_validation()
 
@@ -62,7 +62,7 @@ class Property(ObjectWithDictEquality):
         return [
             self.sale_type,
             self.details,
-            self.address
+            self.address_text
         ]
 
     def map_attributes(self, fn):
@@ -75,7 +75,7 @@ class Property(ObjectWithDictEquality):
         type_checks = [
             (self.sale_type, SaleType),
             (self.details, Details),
-            (self.address, Address)
+            (self.address_text, AddressText)
         ]
 
         for attr, required_type in type_checks:
@@ -101,13 +101,30 @@ class DataContentTypeNotSupported(Property):
         self.data_content_type = data_content_type
         self.sale_type = EmptyPropertyAttribute()
         self.details = EmptyPropertyAttribute()
-        self.address = EmptyPropertyAttribute()
+        self.address_text = EmptyPropertyAttribute()
 
     def is_valid(self):
         return False
 
     def summarise(self):
         return 'data-content-type not supported, %s' % self.data_content_type
+
+
+class AddressText(ObjectWithDictEquality):
+    def __init__(self, string):
+        self.string = string
+
+    def is_valid(self):
+        return True
+
+    def summarise(self):
+        return self.string
+
+    def column_names():
+        return ('address_text',)
+
+    def to_tuple(self):
+        return (self.string,)
 
 
 class Address(ObjectWithDictEquality):
