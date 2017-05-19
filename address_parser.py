@@ -3,7 +3,7 @@ import re
 import real_estate.real_estate_property as rep
 
 
-class RealEstateAddressParser():
+class RealEstateAddressParser(object):
     """
     Parse real estate address strings from the internet using libpostal.
 
