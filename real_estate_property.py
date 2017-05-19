@@ -25,8 +25,13 @@ class Property(ObjectWithDictEquality):
         self.sale_type = sale_type
         self.details = details
         self.address_text = address_text
+        self.address = NotYetPopulated()
 
         self.self_validation()
+
+    def populate_address(self, address):
+        self.type_check(((address, Address),))
+        self.address = address
 
     def is_valid(self):
         return all(self.map_attributes(lambda x: x.is_valid()))
@@ -75,10 +80,13 @@ class Property(ObjectWithDictEquality):
         type_checks = [
             (self.sale_type, SaleType),
             (self.details, Details),
-            (self.address_text, AddressText)
+            (self.address_text, AddressText),
+            (self.address, NotYetPopulated)
         ]
+        self.type_check(type_checks)
 
-        for attr, required_type in type_checks:
+    def type_check(self, checks):
+        for attr, required_type in checks:
             if not isinstance(attr, required_type):
                 raise TypeError('%s is not %s' %
                     (str(attr), str(required_type))
@@ -94,6 +102,23 @@ class EmptyPropertyAttribute(ObjectWithDictEquality):
 
     def summarise(self):
         return ''
+
+
+class NotYetPopulated(EmptyPropertyAttribute):
+    def not_yet_populated_error():
+        raise RuntimeError('This field needs to be populated')
+
+    def is_valid(self):
+        self.not_yet_populated_error()
+
+    def summarise(self):
+        self.not_yet_populated_error()
+
+    def column_names():
+        self.not_yet_populated_error()
+
+    def to_tuple(self):
+        self.not_yet_populated_error()
 
 
 class DataContentTypeNotSupported(Property):

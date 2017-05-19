@@ -7,6 +7,7 @@ import pandas as pd
 from scraper.page_scraper import PageScraper
 from real_estate.json_load_and_dump import JSONLoadAndDump
 from real_estate.data_processing.data_storer import DataStorer
+from real_estate.processed_address_parser import PAP
 
 
 class WebsiteScraper():
@@ -17,10 +18,14 @@ class WebsiteScraper():
         if len(properties) == 0:
             raise RuntimeError('Properties list is empty.')
 
+        properties = WebsiteScraper.parse_addresses_separately(properties)
         data = [p.to_tuple() + (scrape_datetime,) for p in properties]
         column_names = properties[0].column_names() + ('date_scraped',)
         df = pd.DataFrame.from_records(data, columns=column_names)
         return df
+
+    def parse_addresses_separately(properties):
+        return PAP.parse(properties)
 
     def update_data_store(df, file_path):
         DataStorer.create_new_unless_exists(df, file_path)
@@ -51,7 +56,11 @@ class WebsiteScraper():
 
     def retrieve_all_pages_for_postcodes(url_manager, pcs):
         soups = []
-        for pc, state in pcs:
+        for i, (pc, state) in enumerate(pcs):
+            print(
+                'Retrieving pages for postcode %i in %s, number %i of %i' %
+                (pc, state, i+1, len(pcs))
+            )
             soups += WebsiteScraper.retrieve_soups_for_postcode(
                 url_manager, pc, state
             )
@@ -61,7 +70,6 @@ class WebsiteScraper():
         soups = []
         for i in range(url_manager.maximum_page_number):
             page_num = i + 1
-            print('Retrieving page %i for %i in %s' % (page_num, pc, state))
             url = url_manager.make_url_for_page_and_postcode(page_num, pc, state)
             soup = WebsiteScraper.retrieve_soup_for_a_single_page(url)
 
