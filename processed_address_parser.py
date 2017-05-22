@@ -33,7 +33,10 @@ class PAP():
             elif not p_is_alive and r is not None:
                 break
             elif not p_is_alive:
-                raise RuntimeError('p died without adding to queue')
+                raise RuntimeError(
+                    'p died without adding to the queue - exit code was %i.'
+                    % p.exitcode
+                )
         return r
 
     def populate_addresses(properties, r):
