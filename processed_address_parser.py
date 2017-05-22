@@ -9,14 +9,16 @@ class PAP():
         address_strings = [p.address_text.string for p in properties]
 
         # multiprocessing.log_to_stderr(logging.DEBUG)
-        q = multiprocessing.Queue()
-        p = multiprocessing.Process(
-            target=PAP.import_and_parse, args=(q, address_strings)
-        )
+        # q = multiprocessing.Queue()
+        # p = multiprocessing.Process(
+        #     target=PAP.import_and_parse, args=(q, address_strings)
+        # )
         print('Starting separate process for parsing addresses.')
-        p.start()
-        r = PAP.get_results(p, q)
-        p.join()
+        # p.start()
+        # r = PAP.get_results(p, q)
+        # p.join()
+
+        PAP.import_and_parse(None, address_strings)
         print('Separate process finished.')
 
         PAP.ensure_queue_is_empty(q)
@@ -58,8 +60,9 @@ class PAP():
         print('2.')
         components = PAP.parse_addresses(parser, strings)
         print('Parsing complete.')
-        q.put(components)
+        # q.put(components)
         print('Added components to the queue.')
+        return components
 
     def parse_addresses(parser, strings):
         print('3.')
