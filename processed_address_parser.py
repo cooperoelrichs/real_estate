@@ -1,5 +1,6 @@
 from time import sleep
 import multiprocessing
+import logging
 import real_estate.real_estate_property as rep
 
 
