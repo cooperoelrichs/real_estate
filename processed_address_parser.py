@@ -1,6 +1,6 @@
 from time import sleep
 import multiprocessing
-import logging
+# import logging
 import real_estate.real_estate_property as rep
 
 
@@ -8,7 +8,7 @@ class PAP():
     def parse(properties):
         address_strings = [p.address_text.string for p in properties]
 
-        multiprocessing.log_to_stderr(logging.DEBUG)
+        # multiprocessing.log_to_stderr(logging.DEBUG)
         q = multiprocessing.Queue()
         p = multiprocessing.Process(
             target=PAP.import_and_parse, args=(q, address_strings)
@@ -53,13 +53,16 @@ class PAP():
     def import_and_parse(q, strings):
         print('Importing address parser.')
         from real_estate.address_parser import RealEstateAddressParser
+        print('1.')
         parser = RealEstateAddressParser()
+        print('2.')
         components = PAP.parse_addresses(parser, strings)
         print('Parsing complete.')
         q.put(components)
         print('Added components to the queue.')
 
     def parse_addresses(parser, strings):
+        print('3.')
         return [parser.parse_and_validate_address(s) for s in strings]
 
     def maybe_create_address(address_components):
