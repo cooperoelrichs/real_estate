@@ -22,12 +22,18 @@ class PAP():
         return properties
 
     def get_results(p, q):
+        r = None
         while True:
-            sleep(0.5)
-            if not q.empty():
+            sleep(0.1)
+            q_empty = q.empty()
+            p_is_alive = p.is_alive()
+            if not q_empty:
                 r = q.get()
-            if not p.is_alive():
                 break
+            elif not p_is_alive and r is not None:
+                break
+            elif not p_is_alive:
+                raise RuntimeError('p died without adding to queue')
         return r
 
     def populate_addresses(properties, r):
