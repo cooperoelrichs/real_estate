@@ -1,29 +1,38 @@
 from time import sleep
 import multiprocessing
-# import logging
 import real_estate.real_estate_property as rep
 
 
 class PAP():
-    def parse(properties):
+    def parse__(properties):
         address_strings = [p.address_text.string for p in properties]
 
-        # multiprocessing.log_to_stderr(logging.DEBUG)
-        # q = multiprocessing.Queue()
-        # p = multiprocessing.Process(
-        #     target=PAP.import_and_parse, args=(q, address_strings)
-        # )
+        multiprocessing.log_to_stderr(logging.DEBUG)
+        q = multiprocessing.Queue()
+        p = multiprocessing.Process(
+            target=PAP.import_and_parse, args=(q, address_strings)
+        )
         print('Starting separate process for parsing addresses.')
-        # p.start()
-        # r = PAP.get_results(p, q)
-        # p.join()
-
-        PAP.import_and_parse(None, address_strings)
+        p.start()
+        r = PAP.get_results(p, q)
+        p.join()
         print('Separate process finished.')
 
         PAP.ensure_queue_is_empty(q)
         properties = PAP.populate_addresses(properties, r)
         return properties
+
+    def parse(properties):
+        address_strings = [p.address_text.string for p in properties]
+        PAP.dump_strings(address_strings)
+        r = PAP.import_and_parse(None, address_strings)
+        properties = PAP.populate_addresses(properties, r)
+        return properties
+
+    def dump_strings(strings):
+        from real_estate.json_load_and_dump import JSONLoadAndDump
+        JSONLoadAndDump.dump_to_file(strings, 'testing.json')
+        with open('temp.json')
 
     def get_results(p, q):
         r = None
