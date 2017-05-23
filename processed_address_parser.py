@@ -29,6 +29,12 @@ class PAP():
         properties = PAP.populate_addresses(properties, r)
         return properties
 
+    def parse_from_json():
+        address_strings = PAP.load_strings()
+        r = PAP.import_and_parse(None, address_strings)
+        # properties = PAP.populate_addresses(properties, r)
+        return r
+
     FN = 'testing.json'
     def dump_strings(strings):
         from real_estate.json_load_and_dump import JSONLoadAndDump
