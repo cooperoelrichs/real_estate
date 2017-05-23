@@ -29,13 +29,18 @@ class PAP():
         properties = PAP.populate_addresses(properties, r)
         return properties
 
+    FN = 'testing.json'
     def dump_strings(strings):
         from real_estate.json_load_and_dump import JSONLoadAndDump
-        JSONLoadAndDump.dump_to_file(strings, 'testing.json')
+        print('dumping %i strings to %s.' % (len(strings), PAP.FN))
+        JSONLoadAndDump.dump_to_file(strings, PAP.FN)
 
     def load_strings():
         from real_estate.json_load_and_dump import JSONLoadAndDump
-        return JSONLoadAndDump.load_from_file('testing.json')
+        fn = 'testing.json'
+        strings = JSONLoadAndDump.load_from_file(PAP.FN)
+        print('loaded %i strings to %s.' % (len(strings), PAP.FN))
+        return strings
 
     def get_results(p, q):
         r = None
