@@ -7,7 +7,6 @@ class PAP():
     def parse__(properties):
         address_strings = [p.address_text.string for p in properties]
 
-        multiprocessing.log_to_stderr(logging.DEBUG)
         q = multiprocessing.Queue()
         p = multiprocessing.Process(
             target=PAP.import_and_parse, args=(q, address_strings)
