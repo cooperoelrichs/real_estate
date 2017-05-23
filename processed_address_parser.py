@@ -78,9 +78,7 @@ class PAP():
     def import_and_parse(q, strings):
         print('Importing address parser.')
         from real_estate.address_parser import RealEstateAddressParser
-        print('1.')
         parser = RealEstateAddressParser()
-        print('2.')
         components = PAP.parse_addresses(parser, strings)
         print('Parsing complete.')
         # q.put(components)
@@ -88,7 +86,6 @@ class PAP():
         return components
 
     def parse_addresses(parser, strings):
-        print('3.')
         return [parser.parse_and_validate_address(s) for s in strings]
 
     def maybe_create_address(address_components):

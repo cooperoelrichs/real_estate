@@ -169,13 +169,10 @@ class RealEstateAddressParser(object):
     ]
 
     def parse_and_validate_address(self, address_string):
-        print('4.')
         address_components = self.parse_address(address_string)
-        print('5.')
         valid = AddressComponentValidator().validate_address_components(
             address_string, address_components
         )
-        print('6.')
         if valid:
             return address_components
         else:
