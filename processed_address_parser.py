@@ -32,7 +32,10 @@ class PAP():
     def dump_strings(strings):
         from real_estate.json_load_and_dump import JSONLoadAndDump
         JSONLoadAndDump.dump_to_file(strings, 'testing.json')
-        with open('temp.json')
+
+    def load_strings():
+        from real_estate.json_load_and_dump import JSONLoadAndDump
+        return JSONLoadAndDump.load_from_file('testing.json')
 
     def get_results(p, q):
         r = None
