@@ -13,9 +13,9 @@ class MU():
         mem = psutil.Process(pid).memory_info().rss
         return mem, pid
 
-    def gb():
-        mem, _ = MU.memory_usage()
-        return mem / MU.GB_FACTOR
+    def gb_pid():
+        mem, pid = MU.memory_usage()
+        return mem / MU.GB_FACTOR, pid
 
 
     def print_memory_usage():
