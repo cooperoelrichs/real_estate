@@ -12,11 +12,11 @@ class PAP():
         p = multiprocessing.Process(
             target=PAP.import_and_parse, args=(q, address_strings)
         )
-        print('Starting separate process for parsing addresses. %.4fGB, %ipid' % MU.gb_pid())
+        print('Starting separate process for parsing addresses. %.4fGB, pid %i' % MU.gb_pid())
         p.start()
         r = PAP.get_results(p, q)
         p.join()
-        print('Separate process finished. %.4fGB, %ipid' % MU.gb_pid())
+        print('Separate process finished. %.4fGB, pid %i' % MU.gb_pid())
 
         PAP.ensure_queue_is_empty(q)
         properties = PAP.populate_addresses(properties, r)
@@ -76,14 +76,14 @@ class PAP():
             raise RuntimeError('Some results were left in the Queue.')
 
     def import_and_parse(q, strings):
-        print('Importing address parser. %.4fGB, %ipid' % MU.gb_pid())
+        print('Importing address parser. %.4fGB, pid %i' % MU.gb_pid())
         from real_estate.address_parser import RealEstateAddressParser
-        print('Imported address parser. %.4fGB, %ipid' % MU.gb_pid())
+        print('Imported address parser. %.4fGB, pid %i' % MU.gb_pid())
         parser = RealEstateAddressParser()
         components = PAP.parse_addresses(parser, strings)
-        print('Parsing complete. %.4fGB, %ipid' % MU.gb_pid())
+        print('Parsing complete. %.4fGB, pid %i' % MU.gb_pid())
         q.put(components)
-        print('Added components to the queue. %.4fGB, %ipid' % MU.gb_pid())
+        print('Added components to the queue. %.4fGB, pid %i' % MU.gb_pid())
         return components
 
     def parse_addresses(parser, strings):
