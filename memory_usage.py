@@ -15,8 +15,16 @@ class MU():
 
     def gb_pid():
         mem, pid = MU.memory_usage()
-        return mem / MU.GB_FACTOR, pid
+        return MU.to_gb(mem), pid
 
+    def to_gb(mem):
+        return mem / MU.GB_FACTOR
+
+    def object_size(x):
+        return MU.to_gb(sys.getsizeof(x))
+
+    def df_size(x):
+        return MU.to_gb(x.memory_usage(index=True).values.sum())
 
     def print_memory_usage():
         mem, pid = MU.memory_usage()

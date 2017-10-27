@@ -12,7 +12,10 @@ class PAP():
         p = multiprocessing.Process(
             target=PAP.import_and_parse, args=(q, address_strings)
         )
-        print('Starting separate process for parsing addresses. %.4fGB, pid %i' % MU.gb_pid())
+        print(
+            'Starting separate process for parsing addresses. %.4fGB, pid %i'
+            % MU.gb_pid()
+        )
         p.start()
         r = PAP.get_results(p, q)
         p.join()
