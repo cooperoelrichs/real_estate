@@ -1,29 +1,55 @@
 from time import sleep
 import multiprocessing
-# import logging
 import real_estate.real_estate_property as rep
+from real_estate.memory_usage import MU
 
 
 class PAP():
     def parse(properties):
         address_strings = [p.address_text.string for p in properties]
 
-        # multiprocessing.log_to_stderr(logging.DEBUG)
-        # q = multiprocessing.Queue()
-        # p = multiprocessing.Process(
-        #     target=PAP.import_and_parse, args=(q, address_strings)
-        # )
-        print('Starting separate process for parsing addresses.')
-        # p.start()
-        # r = PAP.get_results(p, q)
-        # p.join()
-
-        PAP.import_and_parse(None, address_strings)
-        print('Separate process finished.')
+        q = multiprocessing.Queue()
+        p = multiprocessing.Process(
+            target=PAP.import_and_parse, args=(q, address_strings)
+        )
+        print(
+            'Starting separate process for parsing addresses. %.4fGB, pid %i'
+            % MU.gb_pid()
+        )
+        p.start()
+        r = PAP.get_results(p, q)
+        p.join()
+        print('Separate process finished. %.4fGB, pid %i' % MU.gb_pid())
 
         PAP.ensure_queue_is_empty(q)
         properties = PAP.populate_addresses(properties, r)
         return properties
+
+    def parse__(properties):
+        address_strings = [p.address_text.string for p in properties]
+        PAP.dump_strings(address_strings)
+        r = PAP.import_and_parse(None, address_strings)
+        properties = PAP.populate_addresses(properties, r)
+        return properties
+
+    def parse_from_json():
+        address_strings = PAP.load_strings()
+        r = PAP.import_and_parse(None, address_strings)
+        # properties = PAP.populate_addresses(properties, r)
+        return r
+
+    FN = 'testing.json'
+    def dump_strings(strings):
+        from real_estate.json_load_and_dump import JSONLoadAndDump
+        print('dumping %i strings to %s.' % (len(strings), PAP.FN))
+        JSONLoadAndDump.dump_to_file(strings, PAP.FN)
+
+    def load_strings():
+        from real_estate.json_load_and_dump import JSONLoadAndDump
+        fn = 'testing.json'
+        strings = JSONLoadAndDump.load_from_file(PAP.FN)
+        print('loaded %i strings to %s.' % (len(strings), PAP.FN))
+        return strings
 
     def get_results(p, q):
         r = None
@@ -53,19 +79,17 @@ class PAP():
             raise RuntimeError('Some results were left in the Queue.')
 
     def import_and_parse(q, strings):
-        print('Importing address parser.')
+        print('Importing address parser. %.4fGB, pid %i' % MU.gb_pid())
         from real_estate.address_parser import RealEstateAddressParser
-        print('1.')
+        print('Imported address parser. %.4fGB, pid %i' % MU.gb_pid())
         parser = RealEstateAddressParser()
-        print('2.')
         components = PAP.parse_addresses(parser, strings)
-        print('Parsing complete.')
-        # q.put(components)
-        print('Added components to the queue.')
+        print('Parsing complete. %.4fGB, pid %i' % MU.gb_pid())
+        q.put(components)
+        print('Added components to the queue. %.4fGB, pid %i' % MU.gb_pid())
         return components
 
     def parse_addresses(parser, strings):
-        print('3.')
         return [parser.parse_and_validate_address(s) for s in strings]
 
     def maybe_create_address(address_components):

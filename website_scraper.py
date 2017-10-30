@@ -18,7 +18,6 @@ class WebsiteScraper():
         if len(properties) == 0:
             raise RuntimeError('Properties list is empty.')
 
-        properties = WebsiteScraper.parse_addresses_separately(properties)
         data = [p.to_tuple() + (scrape_datetime,) for p in properties]
         column_names = properties[0].column_names() + ('date_scraped',)
         df = pd.DataFrame.from_records(data, columns=column_names)
@@ -43,6 +42,8 @@ class WebsiteScraper():
         htmls = [str(soup) for soup in soups]
         JSONLoadAndDump.dump_to_file(htmls, file_path)
 
+    # import memory_profiler
+    # @profile
     def load_pages_from_json(file_path, log_file_path):
         htmls = JSONLoadAndDump.load_from_file(file_path)
         pages = [bs4.BeautifulSoup(html, "html.parser") for html in htmls]
@@ -94,10 +95,22 @@ class WebsiteScraper():
         return soups
 
     def retrieve_html_page(url):
-        response = requests.get(url)
+        response = WebsiteScraper.attempt_to_retrieve_page(url, 0, 20)
         response.raise_for_status()
         html = response.text
         return html
+
+    def attempt_to_retrieve_page(url, attempts, max_attempts):
+        for _ in range(max_attempts):
+            try:
+                return requests.get(url, timeout=1)
+            except requests.exceptions.Timeout as e:
+                pass
+            except requests.exceptions.ConnectionError as e:
+                pass
+            print('trying to get page again.')
+        raise e
+
 
     def retrieve_soup_for_a_single_page(url):
         html = WebsiteScraper.retrieve_html_page(url)

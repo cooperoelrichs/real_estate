@@ -65,18 +65,6 @@ class RealEstateAddressParser(object):
         # Special case, Totterdell is a loop and a street in Belconnen.
         (r'(1-9 totterdell), (belconnen)(?i)', r'\1 Street, \2'),
 
-        # Certain city names confuse libpostal, turning ACT into a road.
-        (r'(franklin), act (\d+)(?i)', r'\1, __ACT__ \2'),
-        (r'(greenway), act (\d+)(?i)', r'\1, __ACT__ \2'),
-        (r'(narrabundah), act (\d+)(?i)', r'\1, __ACT__ \2'),
-        (r'(chisholm), act (\d+)(?i)', r'\1, __ACT__ \2'),
-
-        # As above, but more dificult to fix than the others.
-        (r'(melba)(, act \d+)(?i)', r'__\1_City__\2'),
-        (r'(bonner)(, act \d+)(?i)', r'__\1_City__\2'),
-        (r'(tharwa)(, act \d+)(?i)', r'__\1_City__\2'),
-        (r'(uriarra) (village)(, act \d+)(?i)', r'__\1_\2_City__\3'),
-
         # Special cases.
         (
             r'^(\d+/\d+) manhattan on the park ([a-zA-Z]+)(?i)',
@@ -86,6 +74,9 @@ class RealEstateAddressParser(object):
         (r'^(\d+ [a-zA-Z ]+) (form), (?i)', r'__\2__ \1, '),
         (r'^(\d+ [a-zA-Z ]+) (hudson) (square), (?i)', r'__\2_\3__ \1, '),
         (r'^(\d+) (mosaic),(\d+)(?i)', r'__\2__ \1/\3'),
+
+        # Special 'Malmo' case.
+        (r'^(malmo) (\d+)(?i)', r'__\1__, \2'),
     ]]
 
     POSTPROCESSING_LAMBDAS = [
@@ -109,16 +100,11 @@ class RealEstateAddressParser(object):
         (('__act__', 'city'), ('act', 'state')),
 
         # Special cases.
-        (('__nibu__', 'road'), ('nibu', 'house')),
-        (('__form__', 'road'), ('form', 'house')),
+        (('__nibu__', 'house'), ('nibu', 'house')),
+        (('__form__', 'house'), ('form', 'house')),
         (('__hudson_square__', 'house'), ('hudson square', 'house')),
-        (('__mosaic__', 'road'), ('mosaic', 'house')),
-        (('__melba_city__', 'city'), ('melba', 'city')),
-        (('__bonner_city__', 'city'), ('bonner', 'city')),
-        (('__tharwa_city__', 'city'), ('tharwa', 'city')),
-        (('__uriarra_village_city__', 'city'), ('uriarra village', 'city')),
-        (('monash', 'state_district'), ('monash', 'city')),
-        (('tuggeranong', 'state_district'), ('tuggeranong', 'city')),
+        (('__mosaic__', 'house'), ('mosaic', 'house')),
+        (('__malmo__', 'house'), ('malmo', 'house')),
         (
             ('__manhattan_on_the_park__', 'house'),
             ('manhattan on the park', 'house')
@@ -145,7 +131,6 @@ class RealEstateAddressParser(object):
         'fleay place',
         'barraclough crescent',
         'quinlivan crescent',
-        'temple terrace',
         'jeff snell crescent',
         'menzel crescent',
         'glenbawn place',
@@ -164,18 +149,15 @@ class RealEstateAddressParser(object):
         'florence taylor street',
         'ern florence crescent',
         'New South Wales Crescent',
-        'boboyan road',
         'elizabeth jolley crescent'
     ]
 
     def parse_and_validate_address(self, address_string):
-        print('4.')
         address_components = self.parse_address(address_string)
-        print('5.')
         valid = AddressComponentValidator().validate_address_components(
             address_string, address_components
         )
-        print('6.')
+
         if valid:
             return address_components
         else:
@@ -237,33 +219,37 @@ class AddressComponentValidator():
     REQUIRED_ADDRESS_COMPONENTS = [
         ['state', 'special'],
         ['postcode', 'special'],
-        ['city', 'suburb']
+        ['city', 'suburb'],
+        # ['unit', 'house', 'house_number', 'road', 'special']
     ]
+    REJECTED_REGEX = [re.compile(a) for a in [
+        r'__'
+    ]]
 
     def validate_address_components(self, string, components):
         checks = [
-            self.check_for_duplicates(string, components),
-            self.check_for_suburb_and_city(string, components),
-            self.check_for_required_components(string, components)
+            self.check_for_duplicates(components),
+            self.check_for_suburb_and_city(components),
+            self.check_for_required_components(components),
+            self.check_for_rejected_strings(components)
         ]
-
         return all(checks)
 
     def component_names(self, components):
         return [x for _, x in components]
 
-    def check_for_duplicates(self, string, components):
+    def check_for_duplicates(self, components):
         component_names = self.component_names(components)
         return len(component_names) == len(set(component_names))
 
-    def check_for_suburb_and_city(self, string, components):
+    def check_for_suburb_and_city(self, components):
         component_names = self.component_names(components)
         return not (
             'suburb' in component_names and
             'city' in component_names
         )
 
-    def check_for_required_components(self, string, components):
+    def check_for_required_components(self, components):
         component_names = self.component_names(components)
         results = []
         for requires_one_of_these in self.REQUIRED_ADDRESS_COMPONENTS:
@@ -273,4 +259,12 @@ class AddressComponentValidator():
             ]
             results.append(any(checks))
 
+        return all(results)
+
+    def check_for_rejected_strings(self, components):
+        values = [x for x, _ in components]
+        results = []
+        for regex in self.REJECTED_REGEX:
+            for value in values:
+                results.append(re.match(regex, value) is None)
         return all(results)
