@@ -7,7 +7,8 @@ import pandas as pd
 from scraper.page_scraper import PageScraper
 from real_estate.json_load_and_dump import JSONLoadAndDump
 from real_estate.data_processing.data_storer import DataStorer
-from real_estate.processed_address_parser import PAP
+
+from real_estate.memory_usage import MU
 
 
 class WebsiteScraper():
@@ -42,11 +43,12 @@ class WebsiteScraper():
         htmls = [str(soup) for soup in soups]
         JSONLoadAndDump.dump_to_file(htmls, file_path)
 
-    # import memory_profiler
-    # @profile
-    def load_pages_from_json(file_path, log_file_path):
+    def load_pages_from_json(file_path):
+        MU.print_memory_usage()
         htmls = JSONLoadAndDump.load_from_file(file_path)
+        MU.print_memory_usage()
         pages = [bs4.BeautifulSoup(html, "html.parser") for html in htmls]
+        MU.print_memory_usage()
         return pages
 
     def filter_scrapings(scrapings, log_file_path):
