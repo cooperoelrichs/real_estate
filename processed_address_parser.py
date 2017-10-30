@@ -46,7 +46,6 @@ class PAP():
 
     def load_strings():
         from real_estate.json_load_and_dump import JSONLoadAndDump
-        fn = 'testing.json'
         strings = JSONLoadAndDump.load_from_file(PAP.FN)
         print('loaded %i strings to %s.' % (len(strings), PAP.FN))
         return strings

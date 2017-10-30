@@ -27,5 +27,5 @@ class MU():
         return MU.to_gb(x.memory_usage(index=True).values.sum())
 
     def print_memory_usage():
-        mem, pid = MU.memory_usage()
+        gbs, pid = MU.gb_pid()
         print('%.4f GB of memory used by pid %i.' % (gbs, pid))
