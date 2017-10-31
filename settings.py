@@ -10,18 +10,25 @@ class Settings(object):
 
         json_settings = JSONLoadAndDump.load_from_file(
             settings_file_path
-        )[run_type]
+        )
+        run_settings = json_settings[run_type]
+        geo_settings = json_settings['geo_settings']
 
-        data_dir = os.path.join(run_dir, json_settings['data_dir'])
-        html_dir = os.path.join(run_dir, json_settings['html_dir'])
+        data_dir = os.path.join(run_dir, run_settings['data_dir'])
+        html_dir = os.path.join(run_dir, run_settings['html_dir'])
         self.make_dir_unless_exists(data_dir)
         self.make_dir_unless_exists(html_dir)
 
-        self.data_file = os.path.join(data_dir, json_settings['data_file'])
-        self.html_dump = os.path.join(html_dir, json_settings['html_dump'])
+        self.data_file = os.path.join(data_dir, run_settings['data_file'])
+        self.html_dump = os.path.join(html_dir, run_settings['html_dump'])
         self.failures_log = os.path.join(
             data_dir,
-            json_settings['failures_log']
+            run_settings['failures_log']
+        )
+
+        geo_data_dir = os.path.join(run_dir, geo_settings['geo_data_dir'])
+        self.nsw_geo_equivs_file = os.path.join(
+            geo_data_dir, geo_settings['nsw_geo_equivs_file']
         )
 
     def make_dir_unless_exists(self, dir_path):
