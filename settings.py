@@ -13,6 +13,7 @@ class Settings(object):
         )
         run_settings = json_settings[run_type]
         geo_settings = json_settings['geo_settings']
+        slack_settings = json_settings['slack_settings']
 
         data_dir = os.path.join(run_dir, run_settings['data_dir'])
         html_dir = os.path.join(run_dir, run_settings['html_dir'])
@@ -31,6 +32,10 @@ class Settings(object):
             geo_data_dir, geo_settings['nsw_geo_equivs_file']
         )
 
+        self.general_channel = slack_settings['general_channel']
+        self.exception_channel = slack_settings['exception_channel']
+        self.slack_token = slack_settings['slack_token']
+        
     def make_dir_unless_exists(self, dir_path):
         if not os.path.isdir(dir_path) and self.verbosity is True:
             print('Making the directory: %s' % dir_path)
