@@ -24,9 +24,6 @@ class WebsiteScraper():
         df = pd.DataFrame.from_records(data, columns=column_names)
         return df
 
-    def parse_addresses_separately(properties):
-        return PAP.parse(properties)
-
     def update_data_store(df, file_path):
         DataStorer.create_new_unless_exists(df, file_path)
         DataStorer.update_data_store(df, file_path)
