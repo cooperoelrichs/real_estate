@@ -20,7 +20,7 @@ class MU():
         return os.getpid()
 
     def memory_available():
-        mem = psutil.virtual_memory()['available']
+        mem = psutil.virtual_memory().available
         return mem
 
     def ma():
