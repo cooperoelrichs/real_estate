@@ -39,4 +39,5 @@ class MU():
         gb = MU.pmu()
         print(
             '%.4f GB of memory used by pid %i., %.4fGB of memory available' %
-            (gb, MU.get_pid()), MU.ma())
+            (gb, MU.get_pid(), MU.ma())
+        )
