@@ -2,7 +2,6 @@ import csv
 import requests
 from itertools import groupby
 from functools import reduce
-import bs4
 import pandas as pd
 from scraper.page_scraper import PageScraper
 from real_estate.json_load_and_dump import JSONLoadAndDump
@@ -29,24 +28,23 @@ class WebsiteScraper():
         DataStorer.update_data_store(df, file_path)
 
     def retrieve_and_json_pages_by_postcodes(url_manager, file_path, pcs):
-        soups = WebsiteScraper.retrieve_all_pages_for_postcodes(url_manager, pcs)
-        WebsiteScraper.dump_soups(soups, file_path)
+        htmls = WebsiteScraper.retrieve_all_pages_for_postcodes(url_manager, pcs)
+        WebsiteScraper.dump_htmls(htmls, file_path)
 
     def retrieve_and_json_all_pages(url_manager, file_path):
-        soups = WebsiteScraper.retrieve_all_pages(url_manager)
-        WebsiteScraper.dump_soups(soups, file_path)
+        MU.print_memory_usage('04.01')
+        htmls = WebsiteScraper.retrieve_all_pages(url_manager)
+        MU.print_memory_usage('04.02')
+        WebsiteScraper.dump_htmls(htmls, file_path)
+        MU.print_memory_usage('04.03')
 
-    def dump_soups(soups, file_path):
-        htmls = [str(soup) for soup in soups]
+    def dump_htmls(htmls, file_path):
+        # htmls = [str(soup) for soup in soups]
         JSONLoadAndDump.dump_to_file(htmls, file_path)
 
     def load_pages_from_json(file_path):
-        MU.print_memory_usage()
         htmls = JSONLoadAndDump.load_from_file(file_path)
-        MU.print_memory_usage()
-        pages = [bs4.BeautifulSoup(html, "html.parser") for html in htmls]
-        MU.print_memory_usage()
-        return pages
+        return htmls
 
     def filter_scrapings(scrapings, log_file_path):
         valids, invalids = WebsiteScraper.split_scrapings(scrapings)
@@ -55,43 +53,64 @@ class WebsiteScraper():
         return valids, invalids
 
     def retrieve_all_pages_for_postcodes(url_manager, pcs):
-        soups = []
+        htmls = []
         for i, (pc, state) in enumerate(pcs):
             print(
                 'Retrieving pages for postcode %i in %s, number %i of %i' %
                 (pc, state, i+1, len(pcs))
             )
-            soups += WebsiteScraper.retrieve_soups_for_postcode(
+            htmls += WebsiteScraper.retrieve_htmls_for_postcode(
                 url_manager, pc, state
             )
-        return soups
+        return htmls
 
-    def retrieve_soups_for_postcode(url_manager, pc, state):
-        soups = []
+    def retrieve_htmls_for_postcode(url_manager, pc, state):
+        htmls = []
         for i in range(url_manager.maximum_page_number):
             page_num = i + 1
             url = url_manager.make_url_for_page_and_postcode(page_num, pc, state)
-            soup = WebsiteScraper.retrieve_soup_for_a_single_page(url)
+            html = WebsiteScraper.retrieve_html_page(url)
 
-            if PageScraper.no_results_check(soup, page_num):
-                return soups
+            if PageScraper.no_results_check(
+                PageScraper.html_to_soup(html), page_num
+            ):
+                return htmls
             else:
-                soups.append(soup)
+                htmls.append(html)
+        return htmls
 
-    def retrieve_all_pages(url_manager):
-        soups = []
+    # def retrieve_all_pages(url_manager, verbose=False):
+    #     soups = []
+    #     for i in range(url_manager.maximum_page_number):
+    #         page_num = i + 1
+    #         if verbose:
+    #             print('Retrieving page %i.' % page_num)
+    #         url = url_manager.make_url_for_page(page_num)
+    #         soup = WebsiteScraper.retrieve_soup_for_a_single_page(url)
+    #
+    #         if PageScraper.no_results_check(soup, page_num):
+    #             return soups
+    #         else:
+    #             soups.append(soup)
+    #
+    #     return soups
+
+    def retrieve_all_pages(url_manager, verbose=False):
+        htmls = []
         for i in range(url_manager.maximum_page_number):
             page_num = i + 1
-            print('Retrieving page %i.' % page_num)
+            if verbose:
+                print('Retrieving page %i.' % page_num)
             url = url_manager.make_url_for_page(page_num)
-            soup = WebsiteScraper.retrieve_soup_for_a_single_page(url)
+            html = WebsiteScraper.retrieve_html_page(url)
 
-            if PageScraper.no_results_check(soup, page_num):
-                return soups
+            if PageScraper.no_results_check(
+                PageScraper.html_to_soup(html), page_num
+            ):
+                return htmls
             else:
-                soups.append(soup)
-
-        return soups
+                htmls.append(html)
+        return htmls
 
     def retrieve_html_page(url):
         response = WebsiteScraper.attempt_to_retrieve_page(url, 0, 20)
@@ -116,10 +135,10 @@ class WebsiteScraper():
             print('trying to get page again.')
         raise error
 
-    def retrieve_soup_for_a_single_page(url):
-        html = WebsiteScraper.retrieve_html_page(url)
-        soup = bs4.BeautifulSoup(html, "html.parser")
-        return soup
+    # def retrieve_soup_for_a_single_page(url):
+    #     html = WebsiteScraper.retrieve_html_page(url)
+    #     soup = bs4.BeautifulSoup(html, "html.parser")
+    #     return soup
 
     def split_scrapings(scrapings):
         checked_scrapings = [(x.is_valid(), x) for x in scrapings]

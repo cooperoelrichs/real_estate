@@ -3,6 +3,8 @@ import numpy as np
 import os
 import datetime
 
+from real_estate.memory_usage import MU
+
 
 class DataStorer():
     NEW_COLUMNS = ('address_text',)
@@ -17,11 +19,16 @@ class DataStorer():
             DataStorer.to_hdf(df, file_path)
 
     def update_data_store(new_data, file_path):
+        MU.print_memory_usage('07.01')
         new_data = new_data.copy()
+        MU.print_memory_usage('07.02')
         current_data = pd.read_hdf(file_path)
+        MU.print_memory_usage('07.03')
         current_data = DataStorer.maybe_apply_data_fixes(current_data)
+        MU.print_memory_usage('07.04')
 
         updated_data = DataStorer.update_data(current_data, new_data)
+        MU.print_memory_usage('07.05')
         DataStorer.to_hdf(updated_data, file_path)
 
     def update_data(current_data, new_data):

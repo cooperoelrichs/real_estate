@@ -35,9 +35,14 @@ class MU():
     def df_size(x):
         return MU.to_gb(x.memory_usage(index=True).values.sum())
 
-    def print_memory_usage():
+    def print_memory_usage(prefix=None):
+        if prefix is not None:
+            prefix += '. '
+        else:
+            prefix = ''
+
         gb = MU.pmu()
         print(
-            '%.4f GB of memory used by pid %i., %.4fGB of memory available' %
-            (gb, MU.get_pid(), MU.ma())
+            '%s%.4f GB of memory used by pid %i, %.4fGB of memory available' %
+            (prefix, gb, MU.get_pid(), MU.ma())
         )
