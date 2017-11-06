@@ -196,12 +196,13 @@ class DataStorer():
         df.to_hdf(file_path, 'properties', append=False)
 
     def to_csv(df, file_path):
-        df.to_csv(file_path)
+        df.to_csv(file_path, append=False)
 
     def read_csv(file_path):
-        df = pd.read_csv(file_path)
-        for column in ('last_encounted', 'first_encounted'):
-            df[column] = pd.to_datetime(
-                df[column], format='%Y-%m-%d %H:%M:%S'
+        df = pd.read_csv(file_path, index_col=0)
+
+        for name in ('last_encounted', 'first_encounted'):
+            df[name] = pd.to_datetime(
+                df[name], format='%Y-%m-%d %H:%M:%S'
             )
         return df
