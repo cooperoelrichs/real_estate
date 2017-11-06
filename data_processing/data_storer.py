@@ -196,7 +196,7 @@ class DataStorer():
         df.to_hdf(file_path, 'properties', append=False)
 
     def to_csv(df, file_path):
-        df.to_csv(file_path, append=False)
+        df.to_csv(file_path)
 
     def read_csv(file_path):
         df = pd.read_csv(file_path, index_col=0)
