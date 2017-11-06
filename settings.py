@@ -20,6 +20,7 @@ class Settings(object):
         self.make_dir_unless_exists(data_dir)
         self.make_dir_unless_exists(html_dir)
 
+        self.data_file_type = run_settings['data_file_type']
         self.data_file = os.path.join(data_dir, run_settings['data_file'])
         self.html_dump = os.path.join(html_dir, run_settings['html_dump'])
         self.failures_log = os.path.join(
@@ -35,7 +36,7 @@ class Settings(object):
         self.general_channel = slack_settings['general_channel']
         self.exception_channel = slack_settings['exception_channel']
         self.slack_token = slack_settings['slack_token']
-        
+
     def make_dir_unless_exists(self, dir_path):
         if not os.path.isdir(dir_path) and self.verbosity is True:
             print('Making the directory: %s' % dir_path)

@@ -9,27 +9,27 @@ from real_estate.memory_usage import MU
 class DataStorer():
     NEW_COLUMNS = ('address_text',)
 
-    def create_new_unless_exists(df, file_path):
+    def create_new_unless_exists(df, file_type, file_path):
         if os.path.isfile(file_path):
             pass
         else:
             print('Data file did not exist, creating it: %s' % file_path)
             df = df.copy()
             df = DataStorer.reformat_dataframe(df)
-            DataStorer.to_hdf(df, file_path)
+            DataStorer.to_ft(df, file_type, file_path)
 
-    def update_data_store(new_data, file_path):
+    def update_data_store(new_data, file_type, file_path):
         MU.print_memory_usage('07.01')
-        new_data = new_data.copy()
+        # new_data = new_data.copy()
         MU.print_memory_usage('07.02')
-        current_data = pd.read_hdf(file_path)
+        current_data = DataStorer.read_ft(file_type, file_path)
         MU.print_memory_usage('07.03')
         current_data = DataStorer.maybe_apply_data_fixes(current_data)
         MU.print_memory_usage('07.04')
-
         updated_data = DataStorer.update_data(current_data, new_data)
         MU.print_memory_usage('07.05')
-        DataStorer.to_hdf(updated_data, file_path)
+        DataStorer.to_ft(updated_data, file_type, file_path)
+        MU.print_memory_usage('07.06')
 
     def update_data(current_data, new_data):
         wip_data = DataStorer.update_unbroken_sequences(current_data, new_data)
@@ -173,5 +173,35 @@ class DataStorer():
         new_df = new_df.drop('date_scraped', 1)
         return new_df
 
+    def to_ft(df, file_type, file_path):
+        if file_type == 'hdf':
+            DataStorer.to_hdf(df, file_path)
+        elif file_type == 'csv':
+            DataStorer.to_csv(df, file_path)
+        else:
+            DataStorer.ft_error(file_type)
+
+    def read_ft(file_type, file_path):
+        if file_type == 'hdf':
+            return pd.read_hdf(file_path)
+        elif file_type == 'csv':
+            return DataStorer.read_csv(file_path)
+        else:
+            DataStorer.ft_error(file_type)
+
+    def ft_error(file_type):
+        raise RuntimeError('File type not supported: %s.' % file_type)
+
     def to_hdf(df, file_path):
         df.to_hdf(file_path, 'properties', append=False)
+
+    def to_csv(df, file_path):
+        df.to_csv(file_path)
+
+    def read_csv(file_path):
+        df = pd.read_csv(file_path)
+        for column in ('last_encounted', 'first_encounted'):
+            df[column] = pd.to_datetime(
+                df[column], format='%Y-%m-%d %H:%M:%S'
+            )
+        return df
