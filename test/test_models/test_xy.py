@@ -52,27 +52,71 @@ class TestXY(unittest.TestCase):
         self.general_xy_tests(rentals_xy)
 
     def general_xy_tests(self, xy):
-        self.assertEqual(xy.X.shape, (2, 6))
+        self.assertEqual(xy.X.shape, (2, 25))
         self.assertEqual(xy.y.shape, (2,))
         self.assertIsInstance(xy.X, pd.DataFrame)
         self.assertIsInstance(xy.X.values, np.ndarray)
         self.assertIsInstance(xy.y, pd.Series)
         self.assertIsInstance(xy.y.values, np.ndarray)
         self.assertEqual(list(xy.X.columns), [
-            'bedrooms',
-            'bathrooms',
-            'garage_spaces',
-            'property_type_House',
-            'property_type_Unit',
-            # 'suburb_a'  # Removed so that the parameters are identifiable.
-            'suburb_b'
+               'bedrooms',
+               'garage_spaces',
+               'bathrooms',
+               'bedrooms_^2',
+               'bedrooms_^3',
+               'garage_spaces_^2',
+               'garage_spaces_^3',
+               'bathrooms_^2',
+               'bathrooms_^3',
+               'bedrooms_by_House',
+               'bedrooms_by_Unit',
+               'bathrooms_by_House',
+               'bathrooms_by_Unit',
+               'garage_spaces_by_House',
+               'garage_spaces_by_Unit',
+               'bathrooms_by_a',
+               'bathrooms_by_b',
+               'bedrooms_by_a',
+               'bedrooms_by_b',
+               'garage_spaces_by_a',
+               'garage_spaces_by_b',
+               'property_type_House',
+               'property_type_Unit',
+               'suburb_a',
+               'suburb_b'
         ])
 
-        np.testing.assert_array_equal(xy.X.values, np.array([
+        ['Rental', False, 100, 100, 'House', 2, 1, 1, 'a', 'ACT', 1],
+        ['Rental', False, 50, 200, 'Unit', 3, 2, 3, 'b', 'ACT', 2],
+        ['Negotiation', False, 100, 100, 'Unit', 3, 2, 3, 'b', 'ACT', 2],
+        ['Rental', False, 10, 100, 'Unit', 3, 2, 3, 'b', 'ACT', 2],
+
+        expected_values = np.array([
             [2, 3],
-            [1, 2],
             [1, 3],
+            [1, 2],
+            [4, 9],
+            [8, 27],
+            [1, 9],
+            [1, 27],
+            [1, 4],
+            [1, 8],
+            [2, 0],
+            [0, 3],
+            [1, 0],
+            [0, 2],
+            [1, 0],
+            [0, 3],
+            [1, 0],
+            [0, 2],
+            [2, 0],
+            [0, 3],
+            [1, 0],
+            [0, 3],
             [1, 0],
             [0, 1],
+            [1, 0],
             [0, 1]
-        ]).T)
+        ])
+
+        np.testing.assert_array_equal(xy.X.values, expected_values.T)

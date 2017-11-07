@@ -12,7 +12,7 @@ class TestSettings(unittest.TestCase):
     EXPECTED_DATA_DIR = os.path.join(TEMP_TEST_DIR, 'data')
     EXPECTED_HTML_DIR = os.path.join(EXPECTED_DATA_DIR, 'html')
 
-    EXPECTED_DATA_FILE = os.path.join(EXPECTED_DATA_DIR, 'data.h5')
+    EXPECTED_DATA_FILE = os.path.join(EXPECTED_DATA_DIR, 'data.csv')
     EXPECTED_HTML_FILE = os.path.join(EXPECTED_HTML_DIR, 'html.json')
     EXPECTED_FAILURES_LOG_FILE = os.path.join(EXPECTED_DATA_DIR, 'log.csv')
 
