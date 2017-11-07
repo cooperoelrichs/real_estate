@@ -19,17 +19,25 @@ class DataStorer():
             DataStorer.to_ft(df, file_type, file_path)
 
     def update_data_store(new_data, file_type, file_path):
+        new_shape = new_data.shape
         MU.print_memory_usage('07.01')
         # new_data = new_data.copy()
         MU.print_memory_usage('07.02')
         current_data = DataStorer.read_ft(file_type, file_path)
+        current_shape = current_data.shape
         MU.print_memory_usage('07.03')
         current_data = DataStorer.maybe_apply_data_fixes(current_data)
         MU.print_memory_usage('07.04')
         updated_data = DataStorer.update_data(current_data, new_data)
+        updated_shape = updated_data.shape
         MU.print_memory_usage('07.05')
         DataStorer.to_ft(updated_data, file_type, file_path)
         MU.print_memory_usage('07.06')
+
+        print(
+            'Data shape: new shape %s; current shape %s; updated shape %s.' %
+            (str(new_shape), str(current_shape), str(updated_shape))
+        )
 
     def update_data(current_data, new_data):
         wip_data = DataStorer.update_unbroken_sequences(current_data, new_data)
