@@ -133,6 +133,9 @@ class WebsiteScraper():
             except requests.exceptions.ConnectionError as e:
                 error = e
                 pass
+            except requests.exceptions.HTTPError as e:
+                error = e
+                print(error)
             print('trying to get page again.')
         raise error
 
