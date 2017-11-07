@@ -9,17 +9,12 @@ class TestWebsiteScraper(unittest.TestCase):
             rep.Property(
                 rep.SaleType(None, None, None, None),
                 rep.Details('', 1, 1, 1, None, None),
-                rep.Address(None, None, None, None, None, None)
+                rep.AddressText(None)
             ),
             rep.Property(
                 rep.SaleTypeParseFailed(),
                 rep.Details('', 1, 1, 1, None, None),
-                rep.Address(None, None, None, None, None, None)
-            ),
-            rep.Property(
-                rep.SaleType(None, None, None, None),
-                rep.Details('', 1, 1, 1, None, None),
-                rep.AddressParseFailed(None, None)
+                rep.AddressText(None)
             ),
             rep.DataContentTypeNotSupported('')
         ]

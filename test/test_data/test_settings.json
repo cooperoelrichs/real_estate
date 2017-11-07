@@ -2,8 +2,20 @@
     "test_settings": {
         "data_dir": "data",
         "html_dir": "data/html",
-        "data_file": "data.h5",
+        "data_file_type": "csv",
+        "data_file": "data.csv",
         "html_dump": "html.json",
         "failures_log": "log.csv"
+    },
+
+    "geo_settings": {
+        "geo_data_dir": "",
+        "nsw_geo_equivs_file": ""
+    },
+
+    "slack_settings": {
+        "general_channel": "",
+        "exception_channel": "",
+        "slack_token": ""
     }
 }

@@ -2,16 +2,12 @@ from time import sleep
 import multiprocessing
 import queue
 
-from real_estate.processed_address_parser import PAP
 from real_estate.website_scraper import WebsiteScraper
 
 
-#
-# JOINABLE Q???
-#
+# Todo: joinable queue?
 
-
-class Kip():
+class PPS():
     def make_properties(q1, q2, assistant):
         pages = assistant.load_pages()
         properties = assistant.scraper.scrape_pages(pages)
