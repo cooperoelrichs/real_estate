@@ -114,7 +114,6 @@ class WebsiteScraper():
 
     def retrieve_html_page(url):
         response = WebsiteScraper.attempt_to_retrieve_page(url, 0, 20)
-        response.raise_for_status()
         html = response.text
         return html
 
@@ -122,7 +121,9 @@ class WebsiteScraper():
         error = None
         for _ in range(max_attempts):
             try:
-                return requests.get(url, timeout=1)
+                response = requests.get(url, timeout=1)
+                response.raise_for_status()
+                return response
             except requests.exceptions.Timeout as e:
                 error = e
                 pass
