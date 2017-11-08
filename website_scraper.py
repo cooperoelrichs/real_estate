@@ -119,7 +119,7 @@ class WebsiteScraper():
 
     def attempt_to_retrieve_page(url, attempts, max_attempts):
         error = None
-        for _ in range(max_attempts):
+        for i in range(max_attempts):
             try:
                 response = requests.get(url, timeout=1)
                 response.raise_for_status()
@@ -139,7 +139,7 @@ class WebsiteScraper():
             except requests.exceptions.HTTPError as e:
                 error = e
                 print(error)
-            print('trying to get page again.')
+            print('Trying to get page again, attempt %i.' % i)
         raise error
 
     # def retrieve_soup_for_a_single_page(url):
