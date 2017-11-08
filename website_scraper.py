@@ -11,6 +11,8 @@ from real_estate.memory_usage import MU
 
 
 class WebsiteScraper():
+    REQUEST_RETRIES = 20
+
     def to_hdf(properties, file_path, scrape_datetime):
         raise RuntimeError('removed.')
 
@@ -113,7 +115,9 @@ class WebsiteScraper():
         return htmls
 
     def retrieve_html_page(url):
-        response = WebsiteScraper.attempt_to_retrieve_page(url, 0, 20)
+        response = WebsiteScraper.attempt_to_retrieve_page(
+            url, 0, WebsiteScraper.REQUEST_RETRIES
+        )
         html = response.text
         return html
 
