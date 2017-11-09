@@ -1,16 +1,35 @@
 {
-    "test_settings": {
-        "data_dir": "data",
-        "html_dir": "data/html",
-        "data_file_type": "csv",
-        "data_file": "data.csv",
-        "html_dump": "html.json",
-        "failures_log": "log.csv"
+    "data_dir": "data",
+    "html_dir": "data/html",
+    "geo_data_dir": "",
+
+    "act": {
+        "by_postcode": false,
+        "postcodes_file": null,
+        "postcodes_sample_size": null,
+        "max_page_number": 50,
+        "sales": {
+            "url": "http://www.realestate.com.au/buy/in-act/list",
+            "html_dump": "html.json",
+            "data_file": "data.csv",
+            "failures_log": "log.csv",
+            "data_file_type": "csv"
+        }
     },
 
-    "geo_settings": {
-        "geo_data_dir": "",
-        "nsw_geo_equivs_file": ""
+    "nsw": {
+        "by_postcode": true,
+        "postcodes_file": "",
+        "postcodes_sample_size": 5,
+        "max_page_number": 50,
+        "rentals":{
+            "url": "http://www.realestate.com.au/rent/",
+            "html_dump": "html.json",
+            "data_file": "data.csv",
+            "failures_log": "log.csv",
+            "data_file_type": "csv"
+        }
+
     },
 
     "slack_settings": {

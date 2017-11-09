@@ -10,7 +10,7 @@ class Settings(object):
         return JSONLoadAndDump.load_from_file(fp)
 
     def make_dir_unless_exists(self, dir_path):
-        if not os.path.isdir(dir_path) and self.verbosity is True:
+        if not os.path.isdir(dir_path) and self.verbose is True:
             print('Making the directory: %s' % dir_path)
         os.makedirs(dir_path, exist_ok=True)
 
