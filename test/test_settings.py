@@ -1,7 +1,7 @@
 import unittest
 import shutil
 import os
-from real_estate.settings import Settings
+from real_estate.settings import AssistantSettings, SlackSettings
 
 
 class TestSettings(unittest.TestCase):
@@ -32,15 +32,27 @@ class TestSettings(unittest.TestCase):
             )
 
     def test_settings(self):
-        settings = Settings(
-            self.TEST_SETTINGS_FILE, 'test_settings',
-            self.TEMP_TEST_DIR, verbosity=False
+        settings = AssistantSettings(
+            'act', 'sales',
+            self.TEST_SETTINGS_FILE, self.TEMP_TEST_DIR,
+            verbose=False
         )
+        self.settings_asserts(settings)
 
-        self.assertIs(type(settings), Settings)
+        settings = AssistantSettings(
+            'nsw', 'rentals',
+            self.TEST_SETTINGS_FILE, self.TEMP_TEST_DIR,
+            verbose=False
+        )
+        self.settings_asserts(settings)
+
+    def settings_asserts(self, settings):
         self.assertEqual(settings.data_file, self.EXPECTED_DATA_FILE)
         self.assertEqual(settings.html_dump, self.EXPECTED_HTML_FILE)
         self.assertEqual(settings.failures_log,
                          self.EXPECTED_FAILURES_LOG_FILE)
         self.assertTrue(os.path.isdir(self.EXPECTED_DATA_DIR))
         self.assertTrue(os.path.isdir(self.EXPECTED_HTML_DIR))
+
+    def test_geo_settings(self):
+        SlackSettings(self.TEST_SETTINGS_FILE)
