@@ -30,14 +30,36 @@ class WebsiteScraper():
         DataStorer.update_data_store(df, file_type, file_path)
 
     def retrieve_and_json_pages_by_postcodes(url_manager, file_path, pcs):
-        htmls = WebsiteScraper.retrieve_all_pages_for_postcodes(url_manager, pcs)
-        WebsiteScraper.dump_htmls(htmls, file_path)
+        htmls = WebsiteScraper.retrieve_all_pages_for_postcodes(
+            url_manager, pcs
+        )
+
+        WebsiteScraper.dump_htmls(
+            {
+                'htmls': htmls,
+                'search_description': (
+                    'base URL: %s, max page number: %i\npostcodes: %s'
+                    % (url_manager.base_url, url_manager.maximum_page_number,
+                       ', '.join([str(pc) for pc in pcs]))
+                )
+            },
+            file_path
+        )
 
     def retrieve_and_json_all_pages(url_manager, file_path):
         MU.print_memory_usage('04.01')
         htmls = WebsiteScraper.retrieve_all_pages(url_manager)
         MU.print_memory_usage('04.02')
-        WebsiteScraper.dump_htmls(htmls, file_path)
+        WebsiteScraper.dump_htmls(
+            {
+                'htmls': htmls,
+                'search_description': (
+                    'base URL: %s, max page number: %i'
+                    % (url_manager.base_url, url_manager.maximum_page_number)
+                )
+            },
+            file_path
+        )
         MU.print_memory_usage('04.03')
 
     def dump_htmls(htmls, file_path):
@@ -62,7 +84,7 @@ class WebsiteScraper():
                 (pc, state, i+1, len(pcs))
             )
             htmls += WebsiteScraper.retrieve_htmls_for_postcode(
-                url_manager, pc, state
+                    url_manager, pc, state
             )
         return htmls
 
