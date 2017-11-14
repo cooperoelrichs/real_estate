@@ -25,9 +25,9 @@ class WebsiteScraper():
         df = pd.DataFrame.from_records(data, columns=column_names)
         return df
 
-    def update_data_store(df, file_type, file_path):
+    def update_data_store(df, file_type, file_path, scrape_time):
         DataStorer.create_new_unless_exists(df, file_type, file_path)
-        DataStorer.update_data_store(df, file_type, file_path)
+        DataStorer.update_data_store(df, file_type, file_path, scrape_time)
 
     def retrieve_and_json_pages_by_postcodes(url_manager, file_path, pcs):
         htmls = WebsiteScraper.retrieve_all_pages_for_postcodes(

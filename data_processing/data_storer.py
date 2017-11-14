@@ -8,6 +8,7 @@ from real_estate.memory_usage import MU
 
 class DataStorer():
     NEW_COLUMNS = ('address_text',)
+    THIRTY_OME_DAYS = datetime.timedelta(days=31)
 
     def create_new_unless_exists(df, file_type, file_path):
         if os.path.isfile(file_path):
@@ -18,7 +19,7 @@ class DataStorer():
             df = DataStorer.reformat_dataframe(df)
             DataStorer.to_ft(df, file_type, file_path)
 
-    def update_data_store(new_data, file_type, file_path):
+    def update_data_store(new_data, file_type, file_path, scrape_time):
         new_shape = new_data.shape
         MU.print_memory_usage('07.01')
         # new_data = new_data.copy()
@@ -28,7 +29,7 @@ class DataStorer():
         MU.print_memory_usage('07.03')
         current_data = DataStorer.maybe_apply_data_fixes(current_data)
         MU.print_memory_usage('07.04')
-        updated_data = DataStorer.update_data(current_data, new_data)
+        updated_data = DataStorer.update_data(current_data, new_data, scrape_time)
         updated_shape = updated_data.shape
         MU.print_memory_usage('07.05')
         DataStorer.to_ft(updated_data, file_type, file_path)
@@ -39,23 +40,29 @@ class DataStorer():
             (str(new_shape), str(current_shape), str(updated_shape))
         )
 
-    def update_data(current_data, new_data):
-        wip_data = DataStorer.update_unbroken_sequences(current_data, new_data)
+    def update_data(current_data, new_data, scrape_time):
+        wip_data = DataStorer.update_unbroken_sequences(
+            current_data, new_data, scrape_time
+        )
         updated_data = DataStorer.add_new(wip_data, new_data)
         return updated_data
 
-    def update_unbroken_sequences(current_data, new_data):
-        unbrokens = DataStorer.merge_unbrokens(current_data, new_data)
-        updated_data = DataStorer.break_sequences(current_data, unbrokens)
+    def update_unbroken_sequences(current_data, new_data, scrape_time):
+        updated_data = DataStorer.break_sequences(current_data, scrape_time)
+        unbrokens = DataStorer.merge_unbrokens(updated_data, new_data)
         updated_data = DataStorer.update_last_encountered(
             updated_data, unbrokens)
         return updated_data
 
-    def merge_unbrokens(current_data, new_data):
+    def merge_unbrokens(updated_data, new_data):
         id_columns = DataStorer.get_id_columns(new_data)
-        unbrokens = current_data[DataStorer.sequence_unbroken_filter(current_data)]
+        unbrokens = updated_data[
+            DataStorer.sequence_unbroken_filter(updated_data)
+        ]
         unbrokens = pd.merge(unbrokens, new_data, how='inner', on=id_columns)
-        unbrokens = unbrokens[unbrokens['date_scraped'] >= unbrokens['last_encounted']]
+        # unbrokens = unbrokens[
+        #     unbrokens['date_scraped'] >= unbrokens['last_encounted']
+        # ]
         return unbrokens
 
     def sequence_unbroken_filter(data):
@@ -73,11 +80,21 @@ class DataStorer():
         else:
             return series==value
 
-    def break_sequences(current_data, unbrokens):
+    def break_sequences(current_data, scrape_time):
+        unbrokens = current_data[
+            DataStorer.sequence_unbroken_filter(current_data)
+        ]
         current_data.loc[
             DataStorer.sequence_unbroken_filter(current_data),
             'sequence_broken'
-        ] = current_data.loc[
+        ] = (
+            # DataStorer.zero_matches_filter(current_data, unbrokens) |
+            DataStorer.too_old_filter(current_data, unbrokens, scrape_time)
+        )
+        return current_data
+
+    def zero_matches_filter(current_data, unbrokens):
+        return current_data.loc[
             DataStorer.sequence_unbroken_filter(current_data),
             :
         ].apply(
@@ -85,7 +102,12 @@ class DataStorer():
                 unbrokens, DataStorer.get_id_columns(current_data)
             )
         )
-        return current_data
+
+    def too_old_filter(current_data, unbrokens, scrape_time):
+        return current_data.loc[
+            DataStorer.sequence_unbroken_filter(current_data),
+            'last_encounted'
+        ] <= (scrape_time - DataStorer.THIRTY_OME_DAYS)
 
     def get_id_columns(df):
         return list(df.columns.difference(['date_scraped']).values)
@@ -103,22 +125,26 @@ class DataStorer():
         current_data.loc[
             DataStorer.sequence_unbroken_filter(current_data),
             'last_encounted'
-        ] = current_data.loc[
+        ] = pd.to_datetime(current_data.loc[
             DataStorer.sequence_unbroken_filter(current_data),
             :
         ].apply(
             DataStorer.apply_last_enounted, axis=1, reduce=False, args=(
                 unbrokens, DataStorer.get_id_columns(current_data)
             )
-        )
-
+        ))
         return current_data
 
     def apply_last_enounted(r, x, cols):
-        return x.loc[
+        identicles = x.loc[
             DataStorer.identicles_selection(r, x, cols),
             'date_scraped'
-        ].values[0]
+        ]
+
+        if len(identicles) == 0:
+            return r['last_encounted']
+        else:
+            return identicles.values[0]
 
     def add_new(current_data, new_data):
         id_columns = DataStorer.get_id_columns(new_data)
