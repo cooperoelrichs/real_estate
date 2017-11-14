@@ -233,7 +233,10 @@ class DataStorer():
         df.to_csv(file_path)
 
     def read_csv(file_path):
-        df = pd.read_csv(file_path, index_col=0)
+        df = pd.read_csv(
+            file_path, index_col=0,
+            dtype={'price_min': np.float64, 'price_max': np.float64}
+        )
 
         for name in ('last_encounted', 'first_encounted'):
             df[name] = pd.to_datetime(
