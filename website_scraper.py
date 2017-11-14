@@ -63,7 +63,6 @@ class WebsiteScraper():
         MU.print_memory_usage('04.03')
 
     def dump_htmls(htmls, file_path):
-        # htmls = [str(soup) for soup in soups]
         JSONLoadAndDump.dump_to_file(htmls, file_path)
 
     def load_pages_from_json(file_path):
@@ -72,7 +71,6 @@ class WebsiteScraper():
 
     def filter_scrapings(scrapings, log_file_path):
         valids, invalids = WebsiteScraper.split_scrapings(scrapings)
-        # WebsiteScraper.report_on_failures(invalids)
         WebsiteScraper.log_failures(invalids, log_file_path)
         return valids, invalids
 
@@ -102,22 +100,6 @@ class WebsiteScraper():
             else:
                 htmls.append(html)
         return htmls
-
-    # def retrieve_all_pages(url_manager, verbose=False):
-    #     soups = []
-    #     for i in range(url_manager.maximum_page_number):
-    #         page_num = i + 1
-    #         if verbose:
-    #             print('Retrieving page %i.' % page_num)
-    #         url = url_manager.make_url_for_page(page_num)
-    #         soup = WebsiteScraper.retrieve_soup_for_a_single_page(url)
-    #
-    #         if PageScraper.no_results_check(soup, page_num):
-    #             return soups
-    #         else:
-    #             soups.append(soup)
-    #
-    #     return soups
 
     def retrieve_all_pages(url_manager, verbose=False):
         htmls = []
@@ -168,11 +150,6 @@ class WebsiteScraper():
             print('Trying to get page again, attempt %i.' % i)
         raise error
 
-    # def retrieve_soup_for_a_single_page(url):
-    #     html = WebsiteScraper.retrieve_html_page(url)
-    #     soup = bs4.BeautifulSoup(html, "html.parser")
-    #     return soup
-
     def split_scrapings(scrapings):
         checked_scrapings = [(x.is_valid(), x) for x in scrapings]
         valids = [x for validity, x in checked_scrapings if validity]
@@ -203,8 +180,3 @@ class WebsiteScraper():
     def named_failures(scrapings):
         sorted_scrapings = sorted(scrapings, key=lambda x: x.error_type_name())
         return [(x.error_type_name(), x) for x in sorted_scrapings]
-        # grouped = [[(k, x) for x in X] for k, X in groupby(
-        #     sorted_scrapings, lambda x: x.error_type_name()
-        # )]
-        # flatened = reduce(lambda y1, y2: y1 + y2, grouped)
-        # return flatened

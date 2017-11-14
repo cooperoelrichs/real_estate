@@ -7,7 +7,7 @@ from real_estate.memory_usage import MU
 
 
 class DataStorer():
-    NEW_COLUMNS = ('address_text',)
+    NEW_COLUMNS = ('address_text', 'state', 'postcode')
     THIRTY_OME_DAYS = datetime.timedelta(days=31)
 
     def create_new_unless_exists(df, file_type, file_path):

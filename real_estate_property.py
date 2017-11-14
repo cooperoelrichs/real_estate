@@ -25,13 +25,13 @@ class Property(ObjectWithDictEquality):
         self.sale_type = sale_type
         self.details = details
         self.address_text = address_text
-        self.address = NotYetPopulated()
+        self.state_and_postcode = NotYetPopulated()
+        # self.address = NotYetPopulated()
 
         self.self_validation()
 
     def populate_address(self, address):
-        self.type_check(((address, Address),))
-        self.address = address
+        raise RuntimeError('This is no longer supported.')
 
     def is_valid(self):
         return all(self.map_attributes(lambda x: x.is_valid()))
@@ -67,7 +67,8 @@ class Property(ObjectWithDictEquality):
         return [
             self.sale_type,
             self.details,
-            self.address_text
+            self.address_text,
+            self.state_and_postcode
         ]
 
     def map_attributes(self, fn):
@@ -81,7 +82,7 @@ class Property(ObjectWithDictEquality):
             (self.sale_type, SaleType),
             (self.details, Details),
             (self.address_text, AddressText),
-            (self.address, NotYetPopulated)
+            (self.state_and_postcode, NotYetPopulated)
         ]
         self.type_check(type_checks)
 
@@ -204,6 +205,37 @@ class AddressParseFailed(Address):
         return ('Address parsing failed, %s, %s' %
             (self.string, str(self.components))
         )
+
+
+class StateAndPostcode(ObjectWithDictEquality):
+    def __init__(self, state, postcode):
+        self.state = state
+        self.postcode = postcode
+        self.init_check()
+
+    def is_valid(self):
+        return True
+
+    def to_tuple(self):
+        return (
+            self.state,
+            self.postcode
+        )
+
+    def column_names():
+        return (
+            'state',
+            'postcode'
+        )
+
+    def summarise(self):
+        return (
+            '%s, %s' % (self.state, str(self.postcode))
+        )
+
+    def init_check(self):
+        if self.state is None:
+            raise(RuntimeError('State is required.'))
 
 
 class Details(ObjectWithDictEquality):

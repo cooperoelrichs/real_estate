@@ -19,9 +19,10 @@ class AssistantSettings(Settings):
     def __init__(self, state, run_category, settings_file_path,
                  run_dir, verbose):
         super().__init__(settings_file_path)
+        self.state = state
         self.run_dir = run_dir
         self.verbose = verbose
-        state_settings = self.json[state]
+        state_settings = self.json[self.state]
         run_category_settings = state_settings[run_category]
 
         data_dir = os.path.join(self.run_dir, self.json['data_dir'])
