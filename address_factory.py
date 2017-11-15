@@ -9,11 +9,17 @@ class AddressFactory(object):
     def parse_address(self, address_text):
         address_components = self.parser.parse_and_validate_address(address_text)
         if type(address_components) is rep.AddressParseFailed:
-            return address_components
+            return self.create_address(
+                address_components.components,
+                address_components.is_valid()
+            )
         else:
-            return self.create_address(address_components)
+            # print('VALID ADDRESS!')
+            return self.create_address(
+                address_components, True
+            )
 
-    def create_address(self, address_components):
+    def create_address(self, address_components, is_valid):
         named_components = dict([(b, a) for a, b in address_components])
         address = rep.Address(
             house=named_components.get('house'),
@@ -22,6 +28,7 @@ class AddressFactory(object):
             suburb=named_components.get('suburb',
                                         named_components.get('city')),
             state=named_components.get('state'),
-            postcode=named_components.get('postcode')
+            postcode=named_components.get('postcode'),
+            address_is_valid=is_valid
         )
         return address

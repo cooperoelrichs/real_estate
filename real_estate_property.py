@@ -155,13 +155,15 @@ class AddressText(ObjectWithDictEquality):
 
 class Address(ObjectWithDictEquality):
     def __init__(self,
-                 house, house_number, road, suburb, state, postcode):
+                 house, house_number, road, suburb, state, postcode,
+                 address_is_valid):
         self.house = house
         self.house_number = house_number
         self.road = road
         self.suburb = suburb
         self.state = state
         self.postcode = postcode
+        self.address_is_valid = address_is_valid
 
     def is_valid(self):
         return True
@@ -173,27 +175,29 @@ class Address(ObjectWithDictEquality):
             self.road,
             self.suburb,
             self.state,
-            self.postcode
+            self.postcode,
+            self.address_is_valid
         )
 
-    def column_names():
+    def column_names(self):
         return (
             'house',
             'house_number',
             'road',
             'suburb',
             'state',
-            'postcode'
+            'postcode',
+            'address_is_valid'
         )
 
     def summarise(self):
         return (
-            '%s, %s, %s, %s, %s %s' %
+            '%s, %s, %s, %s, %s %s, %s' %
             self.to_tuple()
         )
 
 
-class AddressParseFailed(Address):
+class AddressParseFailed(ObjectWithDictEquality):
     def __init__(self, string, components):
         self.string = string
         self.components = components
