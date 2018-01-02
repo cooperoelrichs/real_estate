@@ -1,3 +1,4 @@
+import numpy as np
 import real_estate.real_estate_property as rep
 from real_estate.address_parser import RealEstateAddressParser
 

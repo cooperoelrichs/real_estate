@@ -1,3 +1,6 @@
+import math
+import numpy as np
+
 from postal import parser
 import re
 import real_estate.real_estate_property as rep
@@ -153,6 +156,10 @@ class RealEstateAddressParser(object):
     ]
 
     def parse_and_validate_address(self, address_string):
+        if isinstance(address_string, float) and math.isnan(address_string):
+            print('WOOOOOOOOOO!', address_string, type(address_string))
+            return rep.AddressParseFailed(address_string, [])
+
         address_components = self.parse_address(address_string)
         valid = AddressComponentValidator().validate_address_components(
             address_string, address_components
@@ -173,8 +180,9 @@ class RealEstateAddressParser(object):
         return address_components
 
     def preprocess_string(self, address_string):
-        for regex, replacment in self.PREPROCESSING_REGEX_SUBSTITUTIONS:
-            address_string = regex.sub(replacment, address_string)
+        for regex, replacement in self.PREPROCESSING_REGEX_SUBSTITUTIONS:
+            address_string = regex.sub(replacement, address_string)
+
         address_string = self.apply_street_name_preprocessing_fixes(
             address_string)
         return address_string
@@ -184,8 +192,8 @@ class RealEstateAddressParser(object):
             (r'%s, (?i)' % x, self.street_fix_format(x) + ', ')
             for x in self.STREET_NAMES_REQUIRING_FIXES
         ]
-        for regex, replacment in regex_fixes:
-            address_string = re.sub(regex, replacment, address_string)
+        for regex, replacement in regex_fixes:
+            address_string = re.sub(regex, replacement, address_string)
         return address_string
 
     def street_fix_format(self, string):
