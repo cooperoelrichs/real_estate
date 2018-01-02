@@ -1,18 +1,16 @@
 import pandas as pd
 import numpy as np
-
 from IPython.display import display, HTML
+
+from real_estate.data_processing.data_storer import DataStorer
 
 
 class DataAnalysis():
-    def run_data_analysis(data_file_path, xy_class, outputs_dir):
-        data = DataAnalysis.read_data(data_file_path)
+    def run_data_analysis(data_file_path, file_type, xy_class, outputs_dir):
+        data = DataStorer.read_ft(file_type, data_file_path)
         xy = xy_class(data, exclude_suburb=False)
         DataAnalysis.data_summary(data, xy, outputs_dir)
         xy.report_on_data_qc(data, outputs_dir)
-
-    def read_data(data_file_path):
-        return pd.read_hdf(data_file_path)
 
     def display_df_as_html(df):
         DataAnalysis.display_styler_as_html(df.style)
