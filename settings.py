@@ -17,7 +17,7 @@ class Settings(object):
 
 class BasicSettings(Settings):
     def __init__(self, run_category, settings_file_path, run_dir, verbose):
-        super().__init__(settings_file_path)
+        super().__init__(os.path.join(run_dir, settings_file_path))
         self.run_dir = run_dir
         self.verbose = verbose
 
