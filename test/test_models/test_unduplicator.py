@@ -1,12 +1,34 @@
 import unittest
 from datetime import datetime
 import pandas as pd
+import numpy as np
 from pandas.util.testing import (assert_frame_equal, assert_series_equal)
 from real_estate.models.unduplicator import (
-    Unduplicator,
+    Unduplicator, ListingsSubgrouper,
     ParallelListingsError, UnbrokenListingsError,
     UnorderedDateEncountedError, UnorderedListingsError
 )
+
+
+class TestListingsSubgrouper(unittest.TestCase):
+    def test_group(self):
+        df = TestUnduplicator.DF_WITH_PRICE_CHANGES.copy().append(
+            TestUnduplicator.DF_WITH_PARALLELS, ignore_index=True
+        )
+        df = Unduplicator.sort_df_by_property_columns_and(
+            df, Unduplicator.ENCOUNTEREDS
+        )
+        ls = ListingsSubgrouper(
+            df, Unduplicator.property_columns(df), Unduplicator.MAX_TIME_DIFF
+        )
+
+        for i, r in df.iterrows():
+            print(i, ls.group(r))
+
+        np.testing.assert_array_equal(
+            df.apply(ls.group, axis=1, raw=True, reduce=True).values,
+            np.array([1,1,1,1,2,1,2,1,1,1,1,1,1,1,1,1,1,1])
+        )
 
 
 class TestUnduplicator(unittest.TestCase):
@@ -118,7 +140,7 @@ class TestUnduplicator(unittest.TestCase):
 
     def test_make_subgroups_series(self):
         assert_series_equal(
-            pd.Series([1, 1,1,1,2,1,1,1]),
+            pd.Series([1,1,1,1,2,1,1,1]),
             Unduplicator.make_subgroups_series(self.DF_WITH_PRICE_CHANGES.copy())
         )
 
