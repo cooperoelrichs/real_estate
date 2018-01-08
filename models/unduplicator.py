@@ -22,22 +22,21 @@ class Unduplicator():
     '''Data Merger version 2.'''
 
     MAX_TIME_DIFF = timedelta(days=365/2)
-    FIRST_ENCOUNTED = 'first_encounted'
-    LAST_ENCOUNTED = 'last_encounted'
-    ENCOUNTEDS = [FIRST_ENCOUNTED, LAST_ENCOUNTED]
+    FIRST_ENCOUNTERED = 'first_encounted'
+    LAST_ENCOUNTERED = 'last_encounted'
+    ENCOUNTEREDS = [FIRST_ENCOUNTERED, LAST_ENCOUNTERED]
 
     NON_PROPERTY_COLUMNS = [
         'price_min', 'price_max', 'sequence_broken',
-        FIRST_ENCOUNTED, LAST_ENCOUNTED
+        FIRST_ENCOUNTERED, LAST_ENCOUNTERED
     ]
 
     def check_and_unduplicate(df):
         df = Unduplicator.sort_df_by_property_columns_and(
-            df, Unduplicator.ENCOUNTEDS)
+            df, Unduplicator.ENCOUNTEREDS)
         Unduplicator.check_ordering_of_listings(df)
         Unduplicator.check_for_unbrokens(df)
         Unduplicator.check_ordering_of_encounted_dates(df)
-
         df = Unduplicator.unduplicate(df)
         return df
 
@@ -48,12 +47,12 @@ class Unduplicator():
         values = Unduplicator.get_le_and_sb_values(df)
 
         df = Unduplicator.sort_df_by_property_columns_and(
-            df, ['listings_subgroups', Unduplicator.FIRST_ENCOUNTED])
+            df, ['listings_subgroups', Unduplicator.FIRST_ENCOUNTERED])
         dedup_filter = Unduplicator.dedup_filter_keeping_first(
             df, ['listings_subgroups'])
 
         filtered_df = df[dedup_filter].copy()
-        filtered_df[Unduplicator.LAST_ENCOUNTED] = values[Unduplicator.LAST_ENCOUNTED]
+        filtered_df[Unduplicator.LAST_ENCOUNTERED] = values[Unduplicator.LAST_ENCOUNTERED]
         filtered_df['sequence_broken'] = values['sequence_broken']
         filtered_df['price_min'] = values['price_min']
         filtered_df['price_max'] = values['price_max']
@@ -62,12 +61,12 @@ class Unduplicator():
 
     def get_le_and_sb_values(df):
         df = Unduplicator.sort_df_by_property_columns_and(
-            df, ['listings_subgroups', Unduplicator.LAST_ENCOUNTED])
+            df, ['listings_subgroups', Unduplicator.LAST_ENCOUNTERED])
         keep_last = Unduplicator.dedup_filter_keeping_last(
             df, ['listings_subgroups'])
 
         return {
-            Unduplicator.LAST_ENCOUNTED: df.loc[keep_last, Unduplicator.LAST_ENCOUNTED].values,
+            Unduplicator.LAST_ENCOUNTERED: df.loc[keep_last, Unduplicator.LAST_ENCOUNTERED].values,
             'sequence_broken': df.loc[keep_last, 'sequence_broken'].values,
             'price_min': df.loc[keep_last, 'price_min'].values,
             'price_max': df.loc[keep_last, 'price_max'].values
@@ -95,7 +94,6 @@ class Unduplicator():
         ls = ListingsSubgrouper(
             df, property_columns, Unduplicator.MAX_TIME_DIFF
         )
-
         sub_group_series = df.apply(ls.group, axis=1, raw=True, reduce=True)
         return sub_group_series
 
@@ -118,18 +116,18 @@ class Unduplicator():
             (
                 equality_with_next &
                 (
-                    df[Unduplicator.FIRST_ENCOUNTED] >
-                    df[Unduplicator.FIRST_ENCOUNTED].shift(-1)
+                    df[Unduplicator.FIRST_ENCOUNTERED] >
+                    df[Unduplicator.FIRST_ENCOUNTERED].shift(-1)
                 )
             ) | (
                 equality_with_next &
                 (
-                    df[Unduplicator.FIRST_ENCOUNTED] ==
-                    df[Unduplicator.FIRST_ENCOUNTED].shift(-1)
+                    df[Unduplicator.FIRST_ENCOUNTERED] ==
+                    df[Unduplicator.FIRST_ENCOUNTERED].shift(-1)
                 ) &
                 (
-                    df[Unduplicator.LAST_ENCOUNTED] >
-                    df[Unduplicator.LAST_ENCOUNTED].shift(-1)
+                    df[Unduplicator.LAST_ENCOUNTERED] >
+                    df[Unduplicator.LAST_ENCOUNTERED].shift(-1)
                 )
             )
         )
@@ -149,13 +147,13 @@ class Unduplicator():
 
     def check_for_unbrokens(df):
         unbroken_last_encounteds = np.sort(
-            df[~ df['sequence_broken']][Unduplicator.LAST_ENCOUNTED].unique()
+            df[~ df['sequence_broken']][Unduplicator.LAST_ENCOUNTERED].unique()
         )
 
         # unbroken_last_encounteds should unique to a single date.
         if unbroken_last_encounteds.shape[0] != 1:
             damaged_rows = df[
-                df[Unduplicator.LAST_ENCOUNTED].isin(
+                df[Unduplicator.LAST_ENCOUNTERED].isin(
                     unbroken_last_encounteds[:-1]
                 ) &
                 ~ df['sequence_broken']
@@ -168,7 +166,7 @@ class Unduplicator():
 
     def check_ordering_of_encounted_dates(df):
         fe_gt_le = (
-            df[Unduplicator.FIRST_ENCOUNTED] > df[Unduplicator.LAST_ENCOUNTED]
+            df[Unduplicator.FIRST_ENCOUNTERED] > df[Unduplicator.LAST_ENCOUNTERED]
         )
         if fe_gt_le.any():
             raise UnorderedDateEncountedError(
@@ -209,11 +207,11 @@ class ListingsSubgrouper(object):
 
             max_last_encounted = self.df.loc[
                 identicle_and_before_current,
-                Unduplicator.LAST_ENCOUNTED
+                Unduplicator.LAST_ENCOUNTERED
             ].max()
 
             time_difference = (
-                r[Unduplicator.FIRST_ENCOUNTED] - max_last_encounted
+                r[Unduplicator.FIRST_ENCOUNTERED] - max_last_encounted
             )
             new_subgroup = time_difference > self.max_time_diff
 
