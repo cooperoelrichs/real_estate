@@ -35,7 +35,11 @@ class Unduplicator():
         df = Unduplicator.sort_df_by_property_columns_and(
             df, Unduplicator.ENCOUNTEREDS)
         Unduplicator.check_ordering_of_listings(df)
-        Unduplicator.check_for_unbrokens(df)
+
+        # Because we only partialy scrape states we can have unbrokens for
+        # any date.
+        # Unduplicator.check_for_unbrokens(df)
+
         Unduplicator.check_ordering_of_encounted_dates(df)
         df = Unduplicator.unduplicate(df)
         return df
