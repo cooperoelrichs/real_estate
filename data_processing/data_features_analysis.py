@@ -4,14 +4,15 @@ from functools import reduce
 import matplotlib.pyplot as plt
 
 from real_estate.data_processing.data_analysis import DataAnalysis
+from real_estate.data_processing.data_storer import DataStorer
 
 
 class DataFeaturesAnalysis():
-        def run(data_file_path, outputs_dir):
-            df = DataAnalysis.read_data(data_file_path)
+        def run(data_file_path, file_type, outputs_dir):
+            data = DataStorer.read_ft(file_type, data_file_path)
             feature_analysis_dir = outputs_dir + 'feature_analysis_-_'
-            DataFeaturesAnalysis.tables(df, feature_analysis_dir)
-            DataFeaturesAnalysis.plots(df, feature_analysis_dir)
+            DataFeaturesAnalysis.tables(data, feature_analysis_dir)
+            DataFeaturesAnalysis.plots(data, feature_analysis_dir)
 
         def tables(df, feature_analysis_dir):
             pivots = [
