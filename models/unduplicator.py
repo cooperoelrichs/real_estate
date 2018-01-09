@@ -21,7 +21,7 @@ class UnorderedListingsError(DataValidationError):
 class Unduplicator():
     '''Data Merger version 2.'''
 
-    MAX_TIME_DIFF = timedelta(days=365/2)
+    MAX_TIME_DIFF = timedelta(days=365/6)
     FIRST_ENCOUNTERED = 'first_encounted'
     LAST_ENCOUNTERED = 'last_encounted'
     ENCOUNTEREDS = [FIRST_ENCOUNTERED, LAST_ENCOUNTERED]
@@ -91,6 +91,10 @@ class Unduplicator():
         return (list(property_columns) + other_columns)
 
     def make_subgroups_series(df):
+        subgroups = ListingsSubgrouper.group(df)
+        return subgroups
+
+    def make_subgroups_series_using_the_old_method(df):
         # Create a new column that defines which 'group', where
         # a group is seperated on by 'gap', a property is in so that
         # the df can be sorted by property, 'group', first_encounted.
@@ -178,16 +182,36 @@ class Unduplicator():
                 'Rows that failed the check:\n%s' % str(df[fe_gt_le])
             )
 
-class ListingsSubgrouper(object):
+class ListingsSubgrouper():
+    def group(df):
+        pcs = Unduplicator.property_columns(df)
+        eq_prev = (df[pcs] == df[pcs].shift(1)).all(axis=1)
+        time_diff = df['first_encounted'].subtract(df['last_encounted'].shift(1))
+        gt_max = time_diff > Unduplicator.MAX_TIME_DIFF
+
+        new_subgroup = ((~ eq_prev) | gt_max)
+        subgroups = new_subgroup.cumsum()
+        return subgroups
+
+
+class OldListingsSubgrouper(object):
     def __init__(self, df, property_columns, max_time_diff):
         self.current_subgroup = None
         self.df = df
+        self.df_len = len(df)
         self.property_columns = property_columns
         self.max_time_diff = max_time_diff
+
+    def print_progress(self, i):
+        f = 100
+        if (i // (self.df_len/f) - (i-1) // (self.df_len/f)) == 1:
+            print('            %i%%' % (i/self.df_len*100))
 
     def group(self, r):
         r_index = self.df.index.get_loc(r.name)
         previous_index = self.df.index[r_index - 1]
+
+        self.print_progress(r_index)
 
         property_equal_to_previous = (
             r.name == 0 or
