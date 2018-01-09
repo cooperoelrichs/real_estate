@@ -1,5 +1,6 @@
 import unittest
 from datetime import datetime
+from datetime import timedelta
 import pandas as pd
 import numpy as np
 from pandas.util.testing import (assert_frame_equal, assert_series_equal)
@@ -11,23 +12,116 @@ from real_estate.models.unduplicator import (
 
 
 class TestListingsSubgrouper(unittest.TestCase):
+    COLUMNS = [
+        'a', 'b', 'price_min', 'price_max',
+        'first_encounted', 'last_encounted'
+    ]
+
+    UNMERGED = pd.DataFrame(
+        data=[
+            # 1. Normal merge.
+            [1, 'a', 1, 2, datetime(2017, 1, 1), datetime(2017, 2, 1)],
+            [1, 'a', 1, 2, datetime(2017, 2, 1), datetime(2017, 3, 1)],
+            [1, 'a', 1, 2, datetime(2017, 3, 15), datetime(2017, 4, 1)],
+
+            # 2. Normal don't merge
+            [2, 'a', 1, 2, datetime(2017, 1, 1), datetime(2017, 2, 1)],
+            [2, 'b', 1, 2, datetime(2017, 2, 1), datetime(2017, 3, 1)],
+            [2, 'c', 1, 2, datetime(2017, 5, 1), datetime(2017, 6, 1)],
+
+            # 3. Large date gap 1.
+            [3, 'a', 1, 2, datetime(2017, 1, 1), datetime(2017, 2, 1)],
+            [3, 'a', 1, 2, datetime(2017, 9, 1), datetime(2017, 10, 1)],
+            [3, 'a', 1, 2, datetime(2017, 11, 1), datetime(2017, 12, 1)],
+
+            # 4. Large date gap 1, extended test.
+            [3, 'a', 1, 2, datetime(2018, 1, 1), datetime(2018, 2, 1)],
+            [3, 'a', 1, 2, datetime(2018, 2, 15), datetime(2018, 3, 1)],
+            [3, 'a', 1, 2, datetime(2018, 4, 1), datetime(2018, 4, 15)],
+
+            # 5. Large date gap 2.
+            [3, 'b', 1, 2, datetime(2017, 1, 1), datetime(2017, 2, 1)],
+            [3, 'b', 1, 2, datetime(2017, 2, 1), datetime(2017, 3, 1)],
+            [3, 'b', 1, 2, datetime(2017, 11, 1), datetime(2017, 12, 1)],
+
+            # 6. Large date gap 3.
+            [3, 'c', 1, 2, datetime(2017, 1, 1), datetime(2017, 2, 1)],
+            [3, 'c', 1, 2, datetime(2017, 2, 1), datetime(2017, 3, 1)],
+            [3, 'c', 1, 2, datetime(2018, 1, 1), datetime(2018, 2, 1)],
+
+            # 7. Large date gap 4.
+            [3, 'd', 1, 2, datetime(2017, 1, 1), datetime(2017, 2, 1)],
+            [3, 'd', 1, 2, datetime(2017, 8, 1), datetime(2017, 12, 1)],
+            [3, 'd', 1, 2, datetime(2018, 9, 1), datetime(2018, 10, 1)],
+
+            # 8. Parallel 1.
+            [4, 'a', 1, 2, datetime(2017, 1, 1), datetime(2017, 2, 1)],
+            [4, 'a', 1, 2, datetime(2017, 2, 1), datetime(2017, 3, 1)],
+            [4, 'a', 1, 2, datetime(2017, 1, 1), datetime(2017, 4, 1)],
+
+            # 9. Parallel 2.
+            [4, 'b', 1, 2, datetime(2017, 1, 1), datetime(2017, 5, 1)],
+            [4, 'b', 1, 2, datetime(2017, 2, 1), datetime(2017, 3, 1)],
+            [4, 'b', 1, 2, datetime(2017, 3, 1), datetime(2017, 4, 1)],
+
+            # 10. Parallel with a large date gap.
+            [4, 'c', 1, 2, datetime(2017, 1, 1), datetime(2017, 2, 1)],
+            [4, 'c', 1, 2, datetime(2017, 9, 1), datetime(2017, 12, 1)],
+            [4, 'c', 1, 2, datetime(2017, 11, 1), datetime(2017, 12, 1)],
+
+            # 11. Price change
+            [5, 'a', 1, 2, datetime(2017, 1, 1), datetime(2017, 2, 1)],
+            [5, 'a', 3, 4, datetime(2017, 2, 1), datetime(2017, 3, 1)],
+            [5, 'a', 4, 5, datetime(2017, 3, 15), datetime(2017, 4, 1)],
+        ],
+        columns=COLUMNS
+    )
+
+    SUBGROUPS = [
+         1, 1, 1,  # 1
+         2, 3, 4,  # 2
+         5, 6, 6,  # 3
+         6, 6, 6,  # 4
+         7, 7, 8,  # 5
+         9, 9,10,  # 6
+        11,12,13,  # 7
+        14,14,14,  # 8
+        15,15,15,  # 9
+        16,17,17,  # 10
+        18,18,18,  # 11
+    ]
+
+    SUBGROUPS_ = [
+        1,1,1,
+        1,1,1,
+        1,2,2,
+        2,2,2,
+        1,1,2,
+        1,1,2,
+        1,2,3,
+        1,1,1,
+        1,1,1,
+        1,2,2,
+        1,1,1,
+    ]
+
     def test_group(self):
-        df = TestUnduplicator.DF_WITH_PRICE_CHANGES.copy().append(
-            TestUnduplicator.DF_WITH_PARALLELS, ignore_index=True
-        )
-        df = Unduplicator.sort_df_by_property_columns_and(
-            df, Unduplicator.ENCOUNTEREDS
-        )
-        ls = ListingsSubgrouper(
-            df, Unduplicator.property_columns(df), Unduplicator.MAX_TIME_DIFF
-        )
+        # ls = ListingsSubgrouper(
+        #     self.UNMERGED, Unduplicator.property_columns(self.UNMERGED),
+        #     Unduplicator.MAX_TIME_DIFF
+        # )
+        #
+        # for i, r in self.UNMERGED.iterrows():
+        #     print(i, ls.group(r))
+        #
+        # resultant_subgroups = self.UNMERGED.apply(
+        #     ls.group, axis=1, raw=True, reduce=True
+        # ).values
 
-        for i, r in df.iterrows():
-            print(i, ls.group(r))
-
+        resultant_subgroups = ListingsSubgrouper.group(self.UNMERGED)
         np.testing.assert_array_equal(
-            df.apply(ls.group, axis=1, raw=True, reduce=True).values,
-            np.array([1,1,1,1,2,1,2,1,1,1,1,1,1,1,1,1,1,1])
+            resultant_subgroups,
+            self.SUBGROUPS
         )
 
 
@@ -50,6 +144,7 @@ class TestUnduplicator(unittest.TestCase):
         ],
         columns=TEST_COLUMNS
     )
+    DF_WITH_PRICE_CHANGES_SUBGROUPS = pd.Series([1, 1, 2, 3, 4, 5, 5, 5])
 
     DF_WITH_MERGED_PRICE_CHANGES = pd.DataFrame(
         data=[
@@ -140,7 +235,7 @@ class TestUnduplicator(unittest.TestCase):
 
     def test_make_subgroups_series(self):
         assert_series_equal(
-            pd.Series([1,1,1,1,2,1,1,1]),
+            self.DF_WITH_PRICE_CHANGES_SUBGROUPS,
             Unduplicator.make_subgroups_series(self.DF_WITH_PRICE_CHANGES.copy())
         )
 
