@@ -4,7 +4,7 @@ from sklearn.metrics import mean_absolute_error
 
 
 class PriceModel(object):
-    N_FOLDS = 10
+    N_FOLDS = 5
     MODEL_APLHA = 0.1
 
     def __init__(self):
@@ -29,18 +29,21 @@ class PriceModel(object):
         return mean_absolute_error(y_true=self.y, y_pred=self.predict(self.X))
 
     def scores(self):
-        scores = np.array([
-            self.score(train_i, test_i)
-            for train_i, test_i
-            in KFold(n=self.X.shape[0], n_folds=self.N_FOLDS)
-        ])
+        print('Scoring model.')
+        scores = []
+        for i, indicies in enumerate(KFold(n=self.X.shape[0], n_folds=self.N_FOLDS)):
+            train_i, test_i = indicies
+            score = self.score(train_i, test_i)
+            print('    Fold %i: %f' % (i, score))
+            scores += [score]
+
+        scores = np.array(scores)
         return scores
 
     def score(self, train_i, test_i):
         self.model.fit(self.X[train_i], self.y[train_i])
         score = self.model.score(self.X[test_i], self.y[test_i])
 
-        # TODO This is only for testing, remove it.
         if score < -10 ** 6:
             raise RuntimeError(
                 'Encounted a bad score, model likely unidentifiable'
@@ -93,19 +96,3 @@ class PriceModel(object):
 
     def cv_predict(self):
         raise NotImplementedError()
-
-
-class LinearModel(PriceModel):
-    HAS_SIMPLE_COEFS = True
-    HAS_FEATURE_IMPORTANCE = False
-
-    def __init__(self, X, y, X_labels, df):
-        self.model = Ridge(
-            alpha=self.MODEL_APLHA,
-            fit_intercept=True,
-            normalize=True,
-            copy_X=True,
-            # n_jobs=1
-        )
-
-        self.setup_self(X, y, X_labels, df)
