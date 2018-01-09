@@ -15,16 +15,16 @@ class XY(object):
         (('bathrooms', 'property_type'), 'linear_by_categorical'),
         (('garage_spaces', 'property_type'), 'linear_by_categorical'),
 
-        (('bathrooms', 'suburb'), 'linear_by_categorical'),
-        (('bedrooms', 'suburb'), 'linear_by_categorical'),
-        (('garage_spaces', 'suburb'), 'linear_by_categorical'),
+        # (('bathrooms', 'suburb'), 'linear_by_categorical'),
+        # (('bedrooms', 'suburb'), 'linear_by_categorical'),
+        # (('garage_spaces', 'suburb'), 'linear_by_categorical'),
 
         # (('bedrooms',), 'categorical'),
         # (('bathrooms',), 'categorical'),
         # (('garage_spaces',), 'categorical'),
 
         (('property_type',), 'categorical'),
-        (('suburb',), 'categorical')
+        # (('suburb',), 'categorical')
     ]
 
     ORDINAL_EXCLUDE = 1
@@ -52,7 +52,6 @@ class XY(object):
 
         self.y = self.make_y(df)
         self.X = self.make_x(df)
-
         self.categorical_groups = self.make_categorical_groups(df)
         self.by_categorical_groups = self.make_by_categorical_groups(df)
 
@@ -106,8 +105,6 @@ class XY(object):
 
     def make_x(self, df):
         x_spec = self.get_individualised_x_spec()
-
-
         X = df[XY.reduce_tuples(
             [a for a, b in x_spec if b != 'linear_by_categorical']
         )].copy()
@@ -116,7 +113,6 @@ class XY(object):
         )
 
         X = self.prep_work(X, x_spec)
-
         X = pd.get_dummies(
             X, prefix=cats, prefix_sep='_', columns=cats,
             drop_first=False, dummy_na=False
@@ -137,8 +133,12 @@ class XY(object):
             df = self.prep_ordinal(ordinal[0], df)
         for polynomial in [a for a, b in x_spec if b == 'polynomial']:
             df = self.prep_polynomial(polynomial[0], df)
-        for linear_by_categorical in [a for a, b in x_spec
-                                      if b == 'linear_by_categorical']:
+
+        set_of_linear_by_categorical = [
+            a for a, b in x_spec if b == 'linear_by_categorical'
+        ]
+
+        for linear_by_categorical in set_of_linear_by_categorical:
             df = self.prep_linear_by_categorical(linear_by_categorical, df)
         return df
 
@@ -184,6 +184,12 @@ class XY(object):
 
     def prep_linear_by_categorical(self, linear_by_categorical, X):
         linear, categorical = linear_by_categorical
+        print(
+            'Combining %i %s with %i %s' %
+            (len(X[linear].unique()), linear,
+             len(X[categorical].unique()), categorical)
+        )
+
         dummies = pd.get_dummies(
             X[[categorical]], prefix=linear,
             prefix_sep='_by_', columns=[categorical],
