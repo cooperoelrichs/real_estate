@@ -35,4 +35,4 @@ class GBTrees(PriceModel):
         return xgb.XGBRegressor(**params)
 
     def feature_importance(self):
-        return self.model.booster().get_fscore()
+        return self.model.feature_importances_
