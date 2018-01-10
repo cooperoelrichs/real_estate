@@ -6,7 +6,7 @@ from real_estate.data_processing.data_storer import DataStorer
 
 
 class DataAnalysis():
-    def run_data_analysis(data_file_path, file_type, xy_class, outputs_dir):
+    def run(data_file_path, file_type, xy_class, outputs_dir):
         data = DataStorer.read_ft(file_type, data_file_path)
         xy = xy_class(data, exclude_suburb=False)
         DataAnalysis.data_summary(data, xy, outputs_dir)
@@ -23,15 +23,17 @@ class DataAnalysis():
         DataAnalysis.display_styler_as_html(styler)
 
     def save_df_as_html(df, file_path):
-        DataAnalysis.save_styler_as_html(df.style, file_path)
+        DataAnalysis.save_styler_as_html(df.style, file_path, df.shape)
 
-    def save_styler_as_html(styler, file_path):
+    def save_styler_as_html(styler, file_path, shape):
+        print('Rendering a styler %s, this can be slow.' % str(shape))
+        rendered = styler.render()
         with open(file_path, 'w') as f:
-            f.write(styler.render())
+            f.write(rendered)
 
     def save_df_as_html_with_nowrap(df, file_path):
         styler = DataAnalysis.make_styler_with_nowrap(df)
-        DataAnalysis.save_styler_as_html(styler, file_path)
+        DataAnalysis.save_styler_as_html(styler, file_path, df.shape)
 
     def make_styler_with_nowrap(df):
         return df.style.set_table_styles(
