@@ -8,16 +8,20 @@ from pandas.tools.plotting import scatter_matrix
 from scipy.stats import gaussian_kde
 
 from real_estate.data_processing.data_analysis import DataAnalysis
+from real_estate.data_processing.data_storer import DataStorer
 from real_estate.models.xy import XY
 
 
 class ModelAnalysis():
-    def run_model_analysis(
-        data_file_path, xy_class, model_class,
+    MAXIMUM_NUMBER_OF_RESULTS_TO_SAVE = 10**3
+
+    def run(
+        data_file_path, file_type,
+        xy_class, model_class,
         scatter_lims, error_density_lims,
         outputs_dir
     ):
-        data = ModelAnalysis.read_data(data_file_path)
+        data = DataStorer.read_ft(file_type, data_file_path)
         xy = xy_class(data, exclude_suburb=False)
 
         ModelAnalysis.model_analysis(
@@ -25,9 +29,6 @@ class ModelAnalysis():
             model_class, scatter_lims, error_density_lims,
             outputs_dir
         )
-
-    def read_data(data_file_path):
-        return pd.read_hdf(data_file_path)
 
     def model_analysis(
         data, xy, model_class, scatter_lims, error_density_lims,
@@ -39,6 +40,7 @@ class ModelAnalysis():
             outputs_dir + 'discription_of_model_estimations.html',
             filtered_data
         )
+
         ModelAnalysis.model_results_analysis(
             filtered_data, results, xy,
             outputs_dir + 'model_estimations.html'
@@ -74,7 +76,6 @@ class ModelAnalysis():
             xy.X.columns.values
         )
         scores = model.scores()
-
         model.fit()
         estimates = model.predict(model.X)
         mean_absolute_error = model.mean_absolute_error()
@@ -85,7 +86,8 @@ class ModelAnalysis():
             'mean_error': mean_absolute_error,
         })
 
-        DataAnalysis.save_df_as_html(results.describe(), output_file)
+        description = results.describe()
+        DataAnalysis.save_df_as_html(description, output_file)
         return results, model, scores, mean_absolute_error
 
     def model_results_analysis(filtered_data, results, xy, output_file):
@@ -96,7 +98,10 @@ class ModelAnalysis():
         extended_results = extended_results.loc[
             :, ~ extended_results.columns.duplicated('first')
         ]
-        DataAnalysis.save_df_as_html(extended_results, output_file)
+        DataAnalysis.save_df_as_html(
+            extended_results[:ModelAnalysis.MAXIMUM_NUMBER_OF_RESULTS_TO_SAVE],
+            output_file
+        )
 
     def save_model_coefs(model, xy, output_file):
         coefs = pd.DataFrame({
@@ -109,13 +114,9 @@ class ModelAnalysis():
         feature_names = xy.X.columns.values
         raw_feature_importance = model.feature_importance()
 
-        importance_values = [
-            raw_feature_importance.get('f%i' % x, np.nan)
-            for x in np.arange(feature_names.shape[0])
-        ]
         feature_importance = pd.DataFrame({
             'feature': list(feature_names),
-            'importance': importance_values
+            'importance': raw_feature_importance
         })
 
         DataAnalysis.save_df_as_html(feature_importance, output_file)
