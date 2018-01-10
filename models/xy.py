@@ -24,7 +24,7 @@ class XY(object):
         # (('garage_spaces',), 'categorical'),
 
         (('property_type',), 'categorical'),
-        # (('suburb',), 'categorical')
+        (('suburb',), 'categorical')
     ]
 
     ORDINAL_EXCLUDE = 1
@@ -289,8 +289,10 @@ class SalesXY(XY):
 
     def price_qc_filter(self, df):
         return (
-            (df['price_min'] > 2 * 10 ** 4) &
-            (df['price_max'] > 2 * 10 ** 4)
+            (df['price_min'] > 2 * 10**4) &
+            (df['price_max'] > 2 * 10**4) &
+            (df['price_min'] < 10**7) &
+            (df['price_max'] < 10**7)
         )
 
 
@@ -313,5 +315,7 @@ class RentalsXY(XY):
     def price_qc_filter(self, df):
         return (
             (df['price_min'] > 2 * 10 ** 1) &
-            (df['price_max'] > 2 * 10 ** 1)
+            (df['price_max'] > 2 * 10 ** 1) &
+            (df['price_min'] < 5 * 10 ** 3) &
+            (df['price_max'] < 5 * 10 ** 3)
         )
