@@ -5,6 +5,23 @@ from real_estate.models.xy import (XY, SalesXY, RentalsXY)
 
 
 class TestXY(unittest.TestCase):
+    COMPLETE_X_SPEC = [
+        (('bedrooms',), 'polynomial'),
+        (('garage_spaces',), 'polynomial'),
+        (('bathrooms',), 'polynomial'),
+
+        (('bedrooms', 'property_type'), 'linear_by_categorical'),
+        (('bathrooms', 'property_type'), 'linear_by_categorical'),
+        (('garage_spaces', 'property_type'), 'linear_by_categorical'),
+
+        (('bathrooms', 'suburb'), 'linear_by_categorical'),
+        (('bedrooms', 'suburb'), 'linear_by_categorical'),
+        (('garage_spaces', 'suburb'), 'linear_by_categorical'),
+
+        (('property_type',), 'categorical'),
+        (('suburb',), 'categorical')
+    ]
+
     COLUMN_NAMES = [
         'sale_type',
         'under_contract',
@@ -41,13 +58,34 @@ class TestXY(unittest.TestCase):
     )
     RENTALS_Y_VALUES = np.array([100, 125])
 
+    TEST_SUBURB_FILTER_DF = pd.DataFrame(
+        [[0, 'a'],
+         [1, 'a'],
+         [2, 'b'],
+         [3, 'c'],
+         [4, 'a'],
+         [5, 'c'],
+         [6, 'd'],
+         [7, 'a'],
+         [8, 'b'],
+         [9, 'c']],
+        columns=['number', 'suburb']
+    )
+    EXPECTED_SUBURB_FILTER = np.array(
+        [True, True, False, True, True, True, False, True, False, True]
+    )
+
+    def test_minimum_suburb_population_filter(self):
+        f = XY.minimum_suburb_population_filter(self.TEST_SUBURB_FILTER_DF, 3)
+        np.testing.assert_array_equal(f, self.EXPECTED_SUBURB_FILTER)
+
     def test_sales_xy(self):
-        sales_xy = SalesXY(self.TEST_SALES_DF, perform_merges=False)
+        sales_xy = SalesXY(self.TEST_SALES_DF, self.COMPLETE_X_SPEC, perform_merges=False)
         np.testing.assert_array_equal(sales_xy.y, self.SALES_Y_VALUES)
         self.general_xy_tests(sales_xy)
 
     def test_rentals_xy(self):
-        rentals_xy = RentalsXY(self.TEST_RENTALS_DF, perform_merges=False)
+        rentals_xy = RentalsXY(self.TEST_RENTALS_DF, self.COMPLETE_X_SPEC, perform_merges=False)
         np.testing.assert_array_equal(rentals_xy.y, self.RENTALS_Y_VALUES)
         self.general_xy_tests(rentals_xy)
 
@@ -85,11 +123,6 @@ class TestXY(unittest.TestCase):
                'suburb_a',
                'suburb_b'
         ])
-
-        ['Rental', False, 100, 100, 'House', 2, 1, 1, 'a', 'ACT', 1],
-        ['Rental', False, 50, 200, 'Unit', 3, 2, 3, 'b', 'ACT', 2],
-        ['Negotiation', False, 100, 100, 'Unit', 3, 2, 3, 'b', 'ACT', 2],
-        ['Rental', False, 10, 100, 'Unit', 3, 2, 3, 'b', 'ACT', 2],
 
         expected_values = np.array([
             [2, 3],
