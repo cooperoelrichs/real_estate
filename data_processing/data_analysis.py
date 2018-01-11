@@ -8,7 +8,10 @@ from real_estate.data_processing.data_storer import DataStorer
 class DataAnalysis():
     def run(data_file_path, file_type, xy_class, outputs_dir):
         data = DataStorer.read_ft(file_type, data_file_path)
-        xy = xy_class(data, exclude_suburb=False)
+        xy = xy_class(
+            data, xy_class.GENERIC_X_SPEC, exclude_suburb=False,
+            filter_on_suburb_population=True
+        )
         DataAnalysis.data_summary(data, xy, outputs_dir)
         xy.report_on_data_qc(data, outputs_dir)
 
