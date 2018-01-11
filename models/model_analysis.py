@@ -22,7 +22,10 @@ class ModelAnalysis():
         outputs_dir
     ):
         data = DataStorer.read_ft(file_type, data_file_path)
-        xy = xy_class(data, exclude_suburb=False)
+        xy = xy_class(
+            data, xy_class.GENERIC_X_SPEC, exclude_suburb=False,
+            filter_on_suburb_population=True
+        )
 
         ModelAnalysis.model_analysis(
             data, xy,
@@ -58,10 +61,10 @@ class ModelAnalysis():
                 outputs_dir + 'feature_importance.html'
             )
 
-        ModelAnalysis.violin_plot(
-            filtered_data, outputs_dir + 'violin_plot.png')
-        ModelAnalysis.scatter_matrix(
-            filtered_data, xy, outputs_dir + 'scatter_matrix.png')
+        # ModelAnalysis.violin_plot(
+        #     filtered_data, outputs_dir + 'violin_plot.png')
+        # ModelAnalysis.scatter_matrix(
+        #     filtered_data, xy, outputs_dir + 'scatter_matrix.png')
         ModelAnalysis.model_accuracy(
             results, scatter_lims, error_density_lims,
             outputs_dir + 'model_accuracy_scatter_plot.png'
@@ -92,7 +95,7 @@ class ModelAnalysis():
 
     def model_results_analysis(filtered_data, results, xy, output_file):
         extended_results = pd.concat(
-            [filtered_data[XY.reduce_tuples([a for a, _ in xy.X_SPEC])], results],
+            [filtered_data[XY.reduce_tuples([a for a, _ in xy.GENERIC_X_SPEC])], results],
             axis=1, ignore_index=False
         )
         extended_results = extended_results.loc[
