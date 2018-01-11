@@ -6,7 +6,7 @@ from real_estate.models.unduplicator import Unduplicator
 class XY(object):
     """Generate X and y tensors from the properties DataFrame."""
 
-    X_SPEC = [
+    GENERIC_X_SPEC = [
         (('bedrooms',), 'polynomial'),
         (('garage_spaces',), 'polynomial'),
         (('bathrooms',), 'polynomial'),
@@ -39,12 +39,18 @@ class XY(object):
         'garage_spaces': 0,
     }
     # EXCLUDE_SMALLEST_SUBURB = False
+    MINIMUM_SUBURB_POPULATION = 20
 
     VALID_SUBURBS_LIST = None  # Make this
 
-    def setup_self(self, df, exclude_suburb, perform_merges):
+    def setup_self(
+        self, df, x_spec, exclude_suburb, perform_merges,
+        filter_on_suburb_population
+    ):
+        self.x_spec = x_spec
         self.exclude_suburb = exclude_suburb
         self.perform_merges = perform_merges
+        self.filter_on_suburb_population = filter_on_suburb_population
         df = self.filter_data(df)
 
         if self.perform_merges:
@@ -68,6 +74,16 @@ class XY(object):
             np.isfinite(df['bathrooms']) &
             np.isfinite(df['garage_spaces'])
         )
+
+    def minimum_suburb_population_filter(df, min_count):
+        n = df.shape[0]
+        x = df['suburb'].groupby(df['suburb']).count().to_frame()
+        f = df.join(other=x, on='suburb', how='left')[0] >= min_count
+        print(
+            'Filtered from %i to %i (%f) using a minimum suburb population of %i'
+            % (n, f.sum(), f.sum()/n, min_count)
+        )
+        return f
 
     def qc_data_filter(self, df):
         return df[
@@ -122,9 +138,9 @@ class XY(object):
 
     def get_individualised_x_spec(self):
         if self.exclude_suburb:
-            return self.X_SPEC - {('suburb', 'categorical')}
+            return self.x_spec - {('suburb', 'categorical')}
         else:
-            return self.X_SPEC
+            return self.x_spec
 
     def prep_work(self, df, x_spec):
         for categorical in [a for a, b in x_spec if b == 'categorical']:
@@ -271,15 +287,26 @@ class XY(object):
 
 
 class SalesXY(XY):
-    def __init__(self, df, exclude_suburb=False, perform_merges=True):
-        self.setup_self(df, exclude_suburb, perform_merges)
+    def __init__(
+        self, df, x_spec, exclude_suburb=False, perform_merges=True,
+        filter_on_suburb_population=False
+    ):
+        self.setup_self(
+            df, x_spec, exclude_suburb, perform_merges,
+            filter_on_suburb_population
+        )
 
     def invalid_data_filter(self, df):
         # Required data: sale_type, price, and suburb
-        return df[
+        df = df[
             self.invalid_sale_data_filter(df) &
             self.generaly_invalid_data_filter(df)
         ]
+        if self.filter_on_suburb_population:
+            df = df[XY.minimum_suburb_population_filter(
+                df, self.MINIMUM_SUBURB_POPULATION
+            )]
+        return df
 
     def invalid_sale_data_filter(self, df):
         return (
@@ -297,15 +324,26 @@ class SalesXY(XY):
 
 
 class RentalsXY(XY):
-    def __init__(self, df, exclude_suburb=False, perform_merges=True):
-        self.setup_self(df, exclude_suburb, perform_merges)
+    def __init__(
+        self, df, x_spec, exclude_suburb=False, perform_merges=True,
+        filter_on_suburb_population=False
+    ):
+        self.setup_self(
+            df, x_spec, exclude_suburb, perform_merges,
+            filter_on_suburb_population
+        )
 
     def invalid_data_filter(self, df):
         # Required data: sale_type, price, and suburb
-        return df[
+        df = df[
             self.invalid_rental_data_filter(df) &
             self.generaly_invalid_data_filter(df)
         ]
+        if self.filter_on_suburb_population:
+            df = df[XY.minimum_suburb_population_filter(
+                df, self.MINIMUM_SUBURB_POPULATION
+            )]
+        return df
 
     def invalid_rental_data_filter(self, df):
         return (
