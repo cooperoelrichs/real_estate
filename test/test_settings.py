@@ -6,8 +6,8 @@ from real_estate.settings import AssistantSettings, SlackSettings
 
 class TestSettings(unittest.TestCase):
     TEST_DIR = os.path.join('real_estate', 'test', 'test_data')
-    TEST_SETTINGS_FILE = os.path.join(TEST_DIR, 'test_settings.json')
-    TEMP_TEST_DIR = os.path.join(TEST_DIR, 'settings_tests')
+    TEST_SETTINGS_FILE = 'test_settings.json'
+    TEMP_TEST_DIR = os.path.join(TEST_DIR, 'settings_tests_temp_file')
 
     EXPECTED_DATA_DIR = os.path.join(TEMP_TEST_DIR, 'data')
     EXPECTED_HTML_DIR = os.path.join(EXPECTED_DATA_DIR, 'html')
@@ -32,6 +32,15 @@ class TestSettings(unittest.TestCase):
             )
 
     def test_settings(self):
+        os.mkdir(self.TEMP_TEST_DIR)
+        shutil.copyfile(
+            os.path.join(self.TEST_DIR, self.TEST_SETTINGS_FILE),
+            os.path.join(self.TEMP_TEST_DIR, self.TEST_SETTINGS_FILE)
+        )
+
+        print(self.TEST_SETTINGS_FILE)
+        print(self.TEMP_TEST_DIR)
+        # state, run_category, settings_file_path, run_dir, verbose
         settings = AssistantSettings(
             'act', 'sales',
             self.TEST_SETTINGS_FILE, self.TEMP_TEST_DIR,
@@ -55,4 +64,4 @@ class TestSettings(unittest.TestCase):
         self.assertTrue(os.path.isdir(self.EXPECTED_HTML_DIR))
 
     def test_geo_settings(self):
-        SlackSettings(self.TEST_SETTINGS_FILE)
+        SlackSettings(os.path.join(self.TEST_DIR, self.TEST_SETTINGS_FILE))

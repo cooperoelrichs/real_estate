@@ -1,7 +1,21 @@
 {
     "data_dir": "data",
     "html_dir": "data/html",
+    "outputs_dir": "outputs",
     "geo_data_dir": "",
+
+    "run_category_settings": {
+        "sales": {
+            "data_file": "data.csv",
+            "data_file_with_addresses": "",
+            "data_file_type": "csv"
+        },
+        "rentals": {
+            "data_file": "data.csv",
+            "data_file_with_addresses": "",
+            "data_file_type": "csv"
+        }
+    },
 
     "act": {
         "by_postcode": false,
@@ -11,9 +25,7 @@
         "sales": {
             "url": "http://www.realestate.com.au/buy/in-act/list",
             "html_dump": "html.json",
-            "data_file": "data.csv",
-            "failures_log": "log.csv",
-            "data_file_type": "csv"
+            "failures_log": "log.csv"
         }
     },
 
@@ -22,14 +34,11 @@
         "postcodes_file": "",
         "postcodes_sample_size": 5,
         "max_page_number": 50,
-        "rentals":{
+        "rentals": {
             "url": "http://www.realestate.com.au/rent/",
             "html_dump": "html.json",
-            "data_file": "data.csv",
-            "failures_log": "log.csv",
-            "data_file_type": "csv"
+            "failures_log": "log.csv"
         }
-
     },
 
     "slack_settings": {
