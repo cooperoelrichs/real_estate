@@ -59,7 +59,7 @@ class Property(ObjectWithDictEquality):
 
     def summarise(self):
         return (
-            'Property: \n - %s\n - %s\n - %s' %
+            'Property: \n - %s\n - %s\n - %s\n - %s' %
             self.map_attributes(lambda x: x.summarise())
         )
 
@@ -106,7 +106,7 @@ class EmptyPropertyAttribute(ObjectWithDictEquality):
 
 
 class NotYetPopulated(EmptyPropertyAttribute):
-    def not_yet_populated_error():
+    def not_yet_populated_error(self):
         raise RuntimeError('This field needs to be populated')
 
     def is_valid(self):
