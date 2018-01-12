@@ -15,9 +15,9 @@ class XY(object):
         (('bathrooms', 'property_type'), 'linear_by_categorical'),
         (('garage_spaces', 'property_type'), 'linear_by_categorical'),
 
-        # (('bathrooms', 'suburb'), 'linear_by_categorical'),
-        # (('bedrooms', 'suburb'), 'linear_by_categorical'),
-        # (('garage_spaces', 'suburb'), 'linear_by_categorical'),
+        (('bathrooms', 'suburb'), 'linear_by_categorical'),
+        (('bedrooms', 'suburb'), 'linear_by_categorical'),
+        (('garage_spaces', 'suburb'), 'linear_by_categorical'),
 
         # (('bedrooms',), 'categorical'),
         # (('bathrooms',), 'categorical'),
@@ -38,10 +38,9 @@ class XY(object):
         'bathrooms': 0,
         'garage_spaces': 0,
     }
-    # EXCLUDE_SMALLEST_SUBURB = False
-    MINIMUM_SUBURB_POPULATION = 20
 
-    VALID_SUBURBS_LIST = None  # Make this
+    MINIMUM_SUBURB_POPULATION = 100
+    # VALID_SUBURBS_LIST = None  # Make this
 
     def setup_self(
         self, df, x_spec, exclude_suburb, perform_merges,
@@ -60,6 +59,18 @@ class XY(object):
         self.X = self.make_x(df)
         self.categorical_groups = self.make_categorical_groups(df)
         self.by_categorical_groups = self.make_by_categorical_groups(df)
+        self.report_data_shape(
+            self.X, self.y,
+            self.categorical_groups, self.by_categorical_groups
+        )
+
+    def report_data_shape(self, X, y, cats, by_cats):
+        n_cats = sum(x2-x1 for _, x1, x2 in cats)
+        n_by_cats = sum(x2-x1 for _, _, x1, x2 in by_cats)
+        print('Shape of X - %s' % str(X.shape))
+        print('Shape of y - %s' % str(y.shape))
+        print('X has %i categoricals and' % n_cats)
+        print('X has %i by categoricals.' % n_by_cats)
 
     def filter_data(self, df):
         df = self.invalid_data_filter(df)
@@ -79,10 +90,12 @@ class XY(object):
         n = df.shape[0]
         x = df['suburb'].groupby(df['suburb']).count().to_frame()
         f = df.join(other=x, on='suburb', how='left')[0] >= min_count
-        print(
-            'Filtered from %i to %i (%f) using a minimum suburb population of %i'
-            % (n, f.sum(), f.sum()/n, min_count)
-        )
+
+        x1 = len(df['suburb'].unique())
+        x2 = len(df.loc[f, 'suburb'].unique())
+        print('Using a minimum suburb population of %i records.' % min_count)
+        print('Filtered from %i to %i (%.3f) records.' % (n, f.sum(), f.sum()/n))
+        print('Leaving %i of %i (%.3f) unique suburbs.' % (x1, x2, x2/x1))
         return f
 
     def qc_data_filter(self, df):
@@ -92,10 +105,7 @@ class XY(object):
         ]
 
     def general_qc_data_filter(self, df):
-        return (
-            pd.Series(np.ones(df.shape[0], dtype=bool), index=df.index)
-            # df['suburb'].isin(self.VALID_SUBURBS_LIST)
-        )
+        return (pd.Series(np.ones(df.shape[0], dtype=bool), index=df.index))
 
     def report_on_data_qc(self, df, outputs_dir):
         price_filtered = df[~ self.price_qc_filter(df)]
@@ -165,25 +175,7 @@ class XY(object):
             X[categorical] == self.CATEGORICALS_EXCLUSIONS[categorical],
             categorical
         ] = np.NaN
-
-        # if (
-        #     categorical == 'suburb' and
-        #     self.EXCLUDE_SMALLEST_SUBURB and
-        #     not self.exclude_suburb
-        # ):
-        #     X = self.exclude_smallest_suburb(X)
         return X
-
-    # def exclude_smallest_suburb(self, X):
-    #     smallest_suburb = X[
-    #         'suburb'
-    #     ].value_counts(
-    #     ).sort_index(
-    #     ).sort_values(
-    #     ).index[0]
-    #
-    #     X.loc[X['suburb'] == smallest_suburb, 'suburb'] = np.NaN
-    #     return X
 
     def prep_ordinal(self, ordinal, X):
         X.loc[X[ordinal] == self.ORDINAL_EXCLUDE, ordinal] = np.NaN
@@ -200,12 +192,6 @@ class XY(object):
 
     def prep_linear_by_categorical(self, linear_by_categorical, X):
         linear, categorical = linear_by_categorical
-        print(
-            'Combining %i %s with %i %s' %
-            (len(X[linear].unique()), linear,
-             len(X[categorical].unique()), categorical)
-        )
-
         dummies = pd.get_dummies(
             X[[categorical]], prefix=linear,
             prefix_sep='_by_', columns=[categorical],
