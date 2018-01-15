@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import numpy as np
 
@@ -44,7 +46,7 @@ class ModelAnalysis():
             filtered_data
         )
 
-        ModelAnalysis.model_results_analysis(
+        extended_results = ModelAnalysis.model_results_analysis(
             filtered_data, results, xy,
             outputs_dir + 'model_estimations.html'
         )
@@ -61,13 +63,16 @@ class ModelAnalysis():
                 outputs_dir + 'feature_importance.html'
             )
 
-        # ModelAnalysis.violin_plot(
-        #     filtered_data, outputs_dir + 'violin_plot.png')
-        # ModelAnalysis.scatter_matrix(
-        #     filtered_data, xy, outputs_dir + 'scatter_matrix.png')
+        ModelAnalysis.violin_plot(
+            filtered_data, outputs_dir + 'violin_plot.png')
+        ModelAnalysis.scatter_matrix(
+            filtered_data, xy, outputs_dir + 'scatter_matrix.png')
         ModelAnalysis.model_accuracy(
             results, scatter_lims, error_density_lims,
             outputs_dir + 'model_accuracy_scatter_plot.png'
+        )
+        ModelAnalysis.model_accuracy_by_feature(
+            extended_results, scatter_lims, outputs_dir
         )
 
         print('Mean absolute error: %.2f' % mean_error)
@@ -95,7 +100,9 @@ class ModelAnalysis():
 
     def model_results_analysis(filtered_data, results, xy, output_file):
         extended_results = pd.concat(
-            [filtered_data[XY.reduce_tuples([a for a, _ in xy.GENERIC_X_SPEC])], results],
+            [filtered_data[XY.reduce_tuples(
+                [a for a, _ in xy.GENERIC_X_SPEC]
+            )], results],
             axis=1, ignore_index=False
         )
         extended_results = extended_results.loc[
@@ -105,6 +112,7 @@ class ModelAnalysis():
             extended_results[:ModelAnalysis.MAXIMUM_NUMBER_OF_RESULTS_TO_SAVE],
             output_file
         )
+        return extended_results
 
     def save_model_coefs(model, xy, output_file):
         coefs = pd.DataFrame({
@@ -150,14 +158,71 @@ class ModelAnalysis():
 
     def model_accuracy(results, scatter_lims, error_density_lims, output_file):
         f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
-        ax1.scatter(results['actuals'], results['estimates'])
-        max_point = results[['actuals', 'estimates']].max().max()
-        ax1.plot([0, max_point], [0, max_point])
-        ax1.set_xlim(scatter_lims)
-        ax1.set_ylim(scatter_lims)
+        ModelAnalysis.scatter_plt_x_on_axis(ax1, results, scatter_lims)
 
         density = gaussian_kde(results['error'][results['estimates']>0])
         x = np.linspace(error_density_lims[0], error_density_lims[1], 10000)
         ax2.plot(x, density(x))
 
         plt.savefig(output_file)
+
+    def model_accuracy_by_feature(
+        df, scatter_lims, outputs_dir
+    ):
+        plots = (
+            ('bedrooms', 'num', (1, 8)),
+            ('garage_spaces', 'num', (1, 8)),
+            ('bathrooms', 'num', (1, 8)),
+            ('property_type', 'cat', 'all')
+        )
+
+        for column, t, qq in plots:
+            if t == 'num':
+                ModelAnalysis.scatter_plot_numerical_column(
+                    df, column, qq, scatter_lims, outputs_dir)
+            elif t == 'cat':
+                ModelAnalysis.scatter_plot_categorical_column(
+                    df, column, qq, scatter_lims, outputs_dir)
+
+    def scatter_plot_numerical_column(df, column, qq, scatter_lims, outputs_dir):
+        x_min, x_max = qq
+        x_len = x_max - x_min + 1
+
+        img_name = 'model_accuracy_-_%s_%i_to_%i+.png' % (column, x_min, x_max)
+        axes_spec = [
+            (i, '>=' if i == x_max else '==', i-1)
+            for i in range(x_min, x_len + 1)
+        ]
+        ModelAnalysis.scatter_plt_series(
+            df, column, axes_spec, x_len, scatter_lims, outputs_dir, img_name)
+
+    def scatter_plot_categorical_column(df, column, qq, scatter_lims, outputs_dir):
+        if qq == 'all':
+            cats = df[column].unique()
+        else:
+            raise RuntimeError('A qq of %s is not supported.' % qq)
+        x_len = len(cats)
+
+        img_name = 'model_accuracy_-_%s_for_%s.png' % (column, qq)
+        axes_spec = [(cats[i], '==', i)for i in range(x_len)]
+        ModelAnalysis.scatter_plt_series(
+            df, column, axes_spec, x_len, scatter_lims, outputs_dir, img_name)
+
+    def scatter_plt_series(
+        df, column, axes_spec, x_len, scatter_lims, outputs_dir, img_name
+    ):
+        f, axes = plt.subplots(1, x_len, figsize=(10*x_len, 10))
+        for value, op, axis_i in axes_spec:
+            if op == '=>':
+                x = df[df[column] >= value]
+            elif op == '==':
+                x = df[df[column] == value]
+            ModelAnalysis.scatter_plt_x_on_axis(axes[axis_i], x, scatter_lims)
+        plt.savefig(os.path.join(outputs_dir, img_name))
+
+    def scatter_plt_x_on_axis(axis, x, scatter_lims):
+        axis.scatter(x['actuals'], x['estimates'])
+        max_point = x[['actuals', 'estimates']].max().max()
+        axis.plot([0, max_point], [0, max_point])
+        axis.set_xlim(scatter_lims)
+        axis.set_ylim(scatter_lims)
