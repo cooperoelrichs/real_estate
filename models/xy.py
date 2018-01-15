@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from sklearn import preprocessing
 from real_estate.models.unduplicator import Unduplicator
 
 
@@ -11,24 +12,28 @@ class XY(object):
         (('garage_spaces',), 'polynomial'),
         (('bathrooms',), 'polynomial'),
 
-        (('bedrooms', 'property_type'), 'linear_by_categorical'),
-        (('bathrooms', 'property_type'), 'linear_by_categorical'),
-        (('garage_spaces', 'property_type'), 'linear_by_categorical'),
-
-        (('bathrooms', 'suburb'), 'linear_by_categorical'),
-        (('bedrooms', 'suburb'), 'linear_by_categorical'),
-        (('garage_spaces', 'suburb'), 'linear_by_categorical'),
-
         # (('bedrooms',), 'categorical'),
         # (('bathrooms',), 'categorical'),
         # (('garage_spaces',), 'categorical'),
 
-        (('property_type',), 'categorical'),
-        (('suburb',), 'categorical')
+        # (('bedrooms', 'property_type'), 'linear_by_categorical'),
+        # (('bathrooms', 'property_type'), 'linear_by_categorical'),
+        # (('garage_spaces', 'property_type'), 'linear_by_categorical'),
+
+        # (('bathrooms', 'suburb'), 'linear_by_categorical'),
+        # (('bedrooms', 'suburb'), 'linear_by_categorical'),
+        # (('garage_spaces', 'suburb'), 'linear_by_categorical'),
+
+        # (('property_type',), 'categorical'),
+        # (('suburb',), 'categorical')
+
+        (('property_type',), 'numerically_encoded'),
+        (('suburb',), 'numerically_encoded'),
+        (('road',), 'numerically_encoded'),
     ]
 
     ORDINAL_EXCLUDE = 1
-    ORDINAL_MAX = 6
+    ORDINAL_MAX = 8
     POLYNOMIAL_DEGREE = 3
 
     CATEGORICALS_EXCLUSIONS = {
@@ -55,22 +60,26 @@ class XY(object):
         if self.perform_merges:
             df = Unduplicator.check_and_unduplicate(df)
 
+        self.numerical_encoders = {}
+
         self.y = self.make_y(df)
         self.X = self.make_x(df)
         self.categorical_groups = self.make_categorical_groups(df)
         self.by_categorical_groups = self.make_by_categorical_groups(df)
+        self.ne_groups = self.make_ne_groups(df)
         self.report_data_shape(
             self.X, self.y,
-            self.categorical_groups, self.by_categorical_groups
+            self.categorical_groups, self.by_categorical_groups, self.ne_groups
         )
 
-    def report_data_shape(self, X, y, cats, by_cats):
+    def report_data_shape(self, X, y, cats, by_cats, nes):
         n_cats = sum(x2-x1 for _, x1, x2 in cats)
         n_by_cats = sum(x2-x1 for _, _, x1, x2 in by_cats)
         print('Shape of X - %s' % str(X.shape))
         print('Shape of y - %s' % str(y.shape))
         print('X has %i categoricals and' % n_cats)
         print('X has %i by categoricals.' % n_by_cats)
+        print('X has %i numerically encoded features.' % len(nes))
 
     def filter_data(self, df):
         df = self.invalid_data_filter(df)
@@ -159,6 +168,8 @@ class XY(object):
             df = self.prep_ordinal(ordinal[0], df)
         for polynomial in [a for a, b in x_spec if b == 'polynomial']:
             df = self.prep_polynomial(polynomial[0], df)
+        for numerical in [a for a, b in x_spec if b == 'numerically_encoded']:
+            df = self.prep_numerically_encoded(numerical[0], df)
 
         set_of_linear_by_categorical = [
             a for a, b in x_spec if b == 'linear_by_categorical'
@@ -167,6 +178,18 @@ class XY(object):
         for linear_by_categorical in set_of_linear_by_categorical:
             df = self.prep_linear_by_categorical(linear_by_categorical, df)
         return df
+
+    def prep_numerically_encoded(self, feature, X):
+        X.loc[:, feature] = [str(a) for a in X[feature].values]
+        le = preprocessing.LabelEncoder()
+        le.fit(X[feature])
+        X.loc[:, feature] = le.transform(X[feature])
+        self.numerical_encoders[feature] = le
+        return X
+
+    def inverse_transform_encoded_feature(self, feature, X):
+        return self.numerical_encoders[feature].inverse_transform(X[feature])
+
 
     def prep_categorical(self, categorical, X):
         # Drop the 'Not Specified' property_type so that we have
@@ -223,6 +246,15 @@ class XY(object):
             current_pos += num_uniques
 
         return categorical_groups
+
+    def make_ne_groups(self, df):
+        x_spec = self.get_individualised_x_spec()
+        self.check_x_spec_ordering(x_spec)
+
+        df = self.prep_work(df.copy(), x_spec)
+        nes = [a[0] for a, b in x_spec if b == 'numerically_encoded']
+        groups = [(feature, df.columns.get_loc(feature)) for feature in nes]
+        return groups
 
     def make_by_categorical_groups(self, df):
         x_spec = self.get_individualised_x_spec()
