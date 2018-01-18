@@ -4,7 +4,7 @@ from sklearn.metrics import mean_absolute_error
 
 
 class PriceModel(object):
-    N_FOLDS = 5
+    N_FOLDS = 3
 
     def __init__(self):
         raise NotImplementedError()
