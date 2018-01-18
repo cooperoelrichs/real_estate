@@ -7,28 +7,32 @@ class GBTrees(PriceModel):
     HAS_FEATURE_IMPORTANCE = True
 
     PARAMS = {
-        'max_depth': 12,  # 3
-        'learning_rate': 0.08,  # 0.1
-        'n_estimators': 1500,  # 100
+        'booster': 'gbtree',
+        'max_depth': 20,  # 3
+        'learning_rate': 0.1,  # 0.1
+        'n_estimators': 1000,  # 100
         'silent': True,
         'objective': 'reg:linear',
         'nthread': -1,  # -1
         'gamma': 0,  # 0
-        'min_child_weight': 1,  # 1
+        'min_child_weight': 4,  # 1
         'max_delta_step': 0,
-        'subsample': 0.8,  # 1
-        'colsample_bytree': 0.1,  # 1
+        'subsample': 0.5,  # 1
+        'colsample_bytree': 1,  # 1
         'colsample_bylevel': 1,
-        'reg_alpha': 0,  # 0
-        'reg_lambda': 1,  # 1
+        'reg_alpha': 0,  # L1 regularization parameter
+        'reg_lambda': 1,  # L2 regularization parameter
         'scale_pos_weight': 1,
         'base_score': 0.5,
         'seed': 0,
         'missing': None
     }
 
-    def __init__(self, X, y, X_labels):
-        self.model = GBTrees.make_model(self.PARAMS)
+    def __init__(self, X, y, X_labels, params=None):
+        if params == None:
+            self.model = GBTrees.make_model(self.PARAMS)
+        else:
+            self.model = GBTrees.make_model(params)
         self.setup_self(X, y, X_labels)
 
     def make_model(params):
