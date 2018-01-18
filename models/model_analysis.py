@@ -24,16 +24,36 @@ class ModelAnalysis():
         outputs_dir
     ):
         data = DataStorer.read_ft(file_type, data_file_path)
-        xy = xy_class(
-            data, xy_class.GENERIC_X_SPEC, exclude_suburb=False,
-            filter_on_suburb_population=True
-        )
+        xy = ModelAnalysis.make_xy(data, xy_class)
 
         ModelAnalysis.model_analysis(
             data, xy,
             model_class, scatter_lims, error_density_lims,
             outputs_dir
         )
+
+    def make_xy(data, xy_class):
+        return xy_class(
+            data, xy_class.GENERIC_X_SPEC, exclude_suburb=False,
+            filter_on_suburb_population=True
+        )
+
+    def test_model_params(
+        data_file_path, file_type, xy_class, model_class, params
+    ):
+        data = DataStorer.read_ft(file_type, data_file_path)
+        xy = ModelAnalysis.make_xy(data, xy_class)
+
+        i = int(xy.X.shape[0]/2)
+        model = model_class(
+            xy.X.values[:i], xy.y.values[:i],
+            xy.X.columns.values,
+            params=params
+        )
+        scores = model.scores()
+        print('Average score: %.3f' % np.mean(scores))
+        return scores
+
 
     def model_analysis(
         data, xy, model_class, scatter_lims, error_density_lims,
@@ -84,6 +104,7 @@ class ModelAnalysis():
             xy.X.columns.values
         )
         scores = model.scores()
+        print('Average score: %.3f' % np.mean(scores))
         model.fit()
         estimates = model.predict(model.X)
         mean_absolute_error = model.mean_absolute_error()
@@ -173,7 +194,8 @@ class ModelAnalysis():
             ('bedrooms', 'num', (1, 8)),
             ('garage_spaces', 'num', (1, 8)),
             ('bathrooms', 'num', (1, 8)),
-            ('property_type', 'cat', 'all')
+            ('property_type', 'cat', 'all'),
+            # ('suburb', 'cat', 'all'),
         )
 
         for column, t, qq in plots:
