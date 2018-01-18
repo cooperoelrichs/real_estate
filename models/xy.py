@@ -104,7 +104,7 @@ class XY(object):
         x2 = len(df.loc[f, 'suburb'].unique())
         print('Using a minimum suburb population of %i records.' % min_count)
         print('Filtered from %i to %i (%.3f) records.' % (n, f.sum(), f.sum()/n))
-        print('Leaving %i of %i (%.3f) unique suburbs.' % (x1, x2, x2/x1))
+        print('Leaving %i of %i (%.3f) unique suburbs.' % (x2, x1, x2/x1))
         return f
 
     def qc_data_filter(self, df):
