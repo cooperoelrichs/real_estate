@@ -27,15 +27,16 @@ class ModelSpecOptimisationPlotter():
 
     def plot(plot, output_file):
         f, axes = plt.subplots(1, len(plot), figsize=(10*len(plot), 10))
+        axes[0].set_ylabel('score')
         for i, sp in enumerate(plot):
-            # axes[i].title = sp.name
             legend = []
             for l in sp.lines:
                 axes[i].plot(l.values, l.results, '-o')
                 legend.append(
                     ModelSpecOptimisationPlotter.legend_name(l.names, l.spec)
                 )
-            axes[-1].legend(legend, prop={'size': 6})
+            axes[i].set_xlabel(sp.name)
+            axes[i].legend(legend, prop={'size': 4})
         plt.savefig(output_file)
 
     def legend_name(names, values):
