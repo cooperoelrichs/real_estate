@@ -12,6 +12,8 @@ from scipy.stats import gaussian_kde
 from real_estate.data_processing.data_analysis import DataAnalysis
 from real_estate.data_processing.data_storer import DataStorer
 from real_estate.models.xy import XY
+from real_estate.models.model_spec_optimisation_plotter import (
+    ModelSpecOptimisationPlotter)
 
 
 class ModelAnalysis():
@@ -38,18 +40,65 @@ class ModelAnalysis():
             filter_on_suburb_population=True
         )
 
-    def test_model_params(
-        data_file_path, file_type, xy_class, model_class, params
+    def test_a_set_of_model_params(
+        data_file_path, file_type, xy_class, model_class,
+        base_params, mod_names, mod_values, outputs_dir
     ):
+        print('Testing %i combinations.\n' % len(mod_values))
+
         data = DataStorer.read_ft(file_type, data_file_path)
         xy = ModelAnalysis.make_xy(data, xy_class)
 
+        results = []
+        for value_set in mod_values:
+            mod = list(zip(mod_names, value_set))
+            params = ModelAnalysis.modify_params(base_params, mod)
+            scores = ModelAnalysis.test_model_params(xy, model_class, params)
+            results.append((mod, scores))
+
+        print('\nAnalysis complete.')
+        ModelAnalysis.report_on_scores(results)
+        file_name = 'parameter_tests_-_%i_combinations.png' % len(mod_values)
+        ModelSpecOptimisationPlotter.run(
+            results, mod_names,
+            os.path.join(outputs_dir, file_name))
+        return results
+
+    def plot_param_test_results(results, ordered_names, output_file):
+        for x in results:
+            print(x)
+
+        f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+        ModelAnalysis.scatter_plt_x_on_axis(ax1, results, scatter_lims)
+        plt.savefig(output_file)
+
+    def modify_params(params, param_mods):
+        params = params.copy()
+        for name, value in param_mods:
+            params[name] = value
+        return params
+
+    def report_on_scores(results):
+        print('\nPrinting results.')
+        for param_mods, scores in results:
+            formatted = map(ModelSpecOptimisationPlotter.strify, param_mods)
+            params_str = ', '.join(formatted)
+            scores_str = ': %.3f (%s)' % (
+                np.mean(scores),
+                ', '.join(map(lambda x: '%.5f' % x, scores))
+            )
+            print(params_str + scores_str)
+
+    def test_model_params(
+        xy, model_class, params
+    ):
         i = int(xy.X.shape[0]/2)
         model = model_class(
             xy.X.values[:i], xy.y.values[:i],
             xy.X.columns.values,
             params=params
         )
+        print()
         scores = model.scores()
         print('Average score: %.3f' % np.mean(scores))
         return scores
