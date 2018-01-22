@@ -42,7 +42,7 @@ class ModelAnalysis():
 
     def test_a_set_of_model_params(
         data_file_path, file_type, xy_class, model_class,
-        base_params, mod_names, mod_values, outputs_dir
+        base_params, mod_names, mod_values, outputs_dir, post_fix=None
     ):
         print('Testing %i combinations.\n' % len(mod_values))
 
@@ -50,15 +50,23 @@ class ModelAnalysis():
         xy = ModelAnalysis.make_xy(data, xy_class)
 
         results = []
-        for value_set in mod_values:
+        for value_set, i in enumerate(mod_values):
             mod = list(zip(mod_names, value_set))
             params = ModelAnalysis.modify_params(base_params, mod)
-            scores = ModelAnalysis.test_model_params(xy, model_class, params)
+            scores = ModelAnalysis.test_model_params(
+                xy, model_class, params, (i, len(mod_values)))
             results.append((mod, scores))
 
         print('\nAnalysis complete.')
         ModelAnalysis.report_on_scores(results)
-        file_name = 'parameter_tests_-_%i_combinations.png' % len(mod_values)
+
+        if post_fix is None:
+            file_name = 'parameter_tests_-_%i_combinations.png' % (
+                len(mod_values))
+        else:
+            file_name = 'parameter_tests_-_%i_combinations_-_%s.png' % (
+                len(mod_values), post_fix)
+
         ModelSpecOptimisationPlotter.run(
             results, mod_names,
             os.path.join(outputs_dir, file_name))
@@ -90,15 +98,14 @@ class ModelAnalysis():
             print(params_str + scores_str)
 
     def test_model_params(
-        xy, model_class, params
+        xy, model_class, params, indicies
     ):
-        i = int(xy.X.shape[0]/2)
         model = model_class(
-            xy.X.values[:i], xy.y.values[:i],
+            xy.X.values, xy.y.values,
             xy.X.columns.values,
             params=params
         )
-        print()
+        print('Scoring combination %i of %i.' % indicies)
         scores = model.scores()
         print('Average score: %.3f' % np.mean(scores))
         return scores
