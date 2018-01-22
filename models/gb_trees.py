@@ -13,7 +13,7 @@ class GBTrees(PriceModel):
         'n_estimators': 1000,  # 100
         'silent': True,
         'objective': 'reg:linear',
-        'nthread': -1,  # -1
+        'n_jobs': 6,  # -1
         'gamma': 0,  # 0
         'min_child_weight': 4,  # 1
         'max_delta_step': 0,
