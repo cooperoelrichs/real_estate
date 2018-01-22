@@ -28,7 +28,6 @@ class PriceModel(object):
         return mean_absolute_error(y_true=self.y, y_pred=self.predict(self.X))
 
     def scores(self):
-        print('Scoring model.')
         scores = []
         for i, indicies in enumerate(KFold(n=self.X.shape[0], n_folds=self.N_FOLDS)):
             train_i, test_i = indicies
