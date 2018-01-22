@@ -50,11 +50,11 @@ class ModelAnalysis():
         xy = ModelAnalysis.make_xy(data, xy_class)
 
         results = []
-        for value_set, i in enumerate(mod_values):
+        for i, value_set in enumerate(mod_values):
             mod = list(zip(mod_names, value_set))
             params = ModelAnalysis.modify_params(base_params, mod)
             scores = ModelAnalysis.test_model_params(
-                xy, model_class, params, (i, len(mod_values)))
+                xy, model_class, params, (i+1, len(mod_values)))
             results.append((mod, scores))
 
         print('\nAnalysis complete.')
