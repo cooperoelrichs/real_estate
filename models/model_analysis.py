@@ -105,7 +105,7 @@ class ModelAnalysis():
             xy.X.columns.values,
             params=params
         )
-        print('Scoring combination %i of %i.' % indicies)
+        print('\nScoring combination %i of %i.' % indicies)
         scores = model.scores()
         print('Average score: %.3f' % np.mean(scores))
         return scores
