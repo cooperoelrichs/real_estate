@@ -38,7 +38,7 @@ class ModelSpecOptimisationPlotter():
                 )
             axes[i].set_xlabel(sp.name)
             axes[i].legend(legend, prop={'size': 4})
-        plt.savefig(output_file)
+        plt.savefig(output_file, dpi=500)
 
     def legend_name(names, values):
         return ', '.join(map(ModelSpecOptimisationPlotter.strify, zip(names, values)))
