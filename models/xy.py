@@ -98,7 +98,9 @@ class XY(object):
     def minimum_suburb_population_filter(df, min_count):
         n = df.shape[0]
         x = df['suburb'].groupby(df['suburb']).count().to_frame()
-        f = df.join(other=x, on='suburb', how='left')[0] >= min_count
+        x.columns=['suburb_count']
+        f = df[['suburb']].join(other=x, on='suburb', how='left')
+        f = f['suburb_count'] >= min_count
 
         x1 = len(df['suburb'].unique())
         x2 = len(df.loc[f, 'suburb'].unique())
