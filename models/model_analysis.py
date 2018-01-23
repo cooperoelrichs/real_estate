@@ -1,4 +1,6 @@
 import os
+import contextlib
+import csv
 
 import pandas as pd
 import numpy as np
@@ -123,15 +125,10 @@ class ModelAnalysis():
 
     def prep_logging(outputs_dir, params, post_fix):
         file_dir = os.path.join(outputs_dir, 'grid_search_results_-_%s.csv' % post_fix)
-
-        import contextlib
         with contextlib.suppress(FileNotFoundError):
             os.remove(file_dir)
 
         header = ['i'] + sorted(list(params.keys())) + ['scores', 'mean']
-        print(header)
-
-        import csv
         with open(file_dir, 'w') as f:
             writer = csv.writer(f)
             writer.writerow(header)
