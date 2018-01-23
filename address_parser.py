@@ -157,7 +157,6 @@ class RealEstateAddressParser(object):
 
     def parse_and_validate_address(self, address_string):
         if isinstance(address_string, float) and math.isnan(address_string):
-            print('WOOOOOOOOOO!', address_string, type(address_string))
             return rep.AddressParseFailed(address_string, [])
 
         address_components = self.parse_address(address_string)
