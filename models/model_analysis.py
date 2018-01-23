@@ -42,19 +42,25 @@ class ModelAnalysis():
 
     def test_a_set_of_model_params(
         data_file_path, file_type, xy_class, model_class,
-        base_params, mod_names, mod_values, outputs_dir, post_fix=None
+        base_params, mod_names, mod_values, outputs_dir, post_fix=None,
+        log=False
     ):
         print('Testing %i combinations.\n' % len(mod_values))
 
         data = DataStorer.read_ft(file_type, data_file_path)
         xy = ModelAnalysis.make_xy(data, xy_class)
 
+        if log:
+            log_file = ModelAnalysis.prep_logging(outputs_dir, base_params, post_fix)
+
         results = []
         for i, value_set in enumerate(mod_values):
             mod = list(zip(mod_names, value_set))
             params = ModelAnalysis.modify_params(base_params, mod)
             scores = ModelAnalysis.test_model_params(
-                xy, model_class, params, (i+1, len(mod_values)))
+                xy, model_class, params, (i+1, len(mod_values)),
+                log=log, log_file=log_file
+            )
             results.append((mod, scores))
 
         print('\nAnalysis complete.')
@@ -89,16 +95,19 @@ class ModelAnalysis():
     def report_on_scores(results):
         print('\nPrinting results.')
         for param_mods, scores in results:
-            formatted = map(ModelSpecOptimisationPlotter.strify, param_mods)
-            params_str = ', '.join(formatted)
-            scores_str = ': %.3f (%s)' % (
-                np.mean(scores),
-                ', '.join(map(lambda x: '%.5f' % x, scores))
-            )
-            print(params_str + scores_str)
+            print(ModelAnalysis.make_scores_report_str(param_mods, scores))
+
+    def make_scores_report_str(param_mods, scores):
+        formatted = map(ModelSpecOptimisationPlotter.strify, param_mods)
+        params_str = ', '.join(formatted)
+        scores_str = ': %.3f (%s)' % (
+            np.mean(scores),
+            ', '.join(map(lambda x: '%.5f' % x, scores))
+        )
+        return params_str + scores_str
 
     def test_model_params(
-        xy, model_class, params, indicies
+        xy, model_class, params, indicies, log, log_file
     ):
         model = model_class(
             xy.X.values, xy.y.values,
@@ -108,8 +117,37 @@ class ModelAnalysis():
         print('\nScoring combination %i of %i.' % indicies)
         scores = model.scores()
         print('Average score: %.3f' % np.mean(scores))
+        if log:
+            ModelAnalysis.log_scores(log_file, scores, params, indicies)
         return scores
 
+    def prep_logging(outputs_dir, params, post_fix):
+        file_dir = os.path.join(outputs_dir, 'grid_search_results_-_%s.csv' % post_fix)
+
+        import contextlib
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(file_dir)
+
+        header = ['i'] + sorted(list(params.keys())) + ['scores', 'mean']
+        print(header)
+
+        import csv
+        with open(file_dir, 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+
+        return file_dir
+
+    def log_scores(file_dir, scores, params, indicies):
+        i, _ = indicies
+        keys = sorted(list(params.keys()))
+        values = [params[k] for k in keys]
+        row = [i] + values + [';'.join(str(x) for x in scores), np.mean(scores)]
+
+        import csv
+        with open(file_dir, 'a') as f:
+            writer = csv.writer(f)
+            writer.writerow(row)
 
     def model_analysis(
         data, xy, model_class, scatter_lims, error_density_lims,
