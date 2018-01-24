@@ -24,8 +24,30 @@ class PriceModel(object):
     def predict(self, X_pred):
         return self.model.predict(X_pred)
 
-    def mean_absolute_error(self):
-        return mean_absolute_error(y_true=self.y, y_pred=self.predict(self.X))
+    def mean_absolute_error(self, y_pred):
+        return mean_absolute_error(y_true=self.y, y_pred=y_pred)
+
+    def cv_score_and_predict(self):
+        scores = []
+        estimates = np.zeros_like(self.y)
+        test = np.ones_like(self.y, dtype=bool)
+        for i, indicies in enumerate(KFold(n=self.X.shape[0], n_folds=self.N_FOLDS)):
+            train_i, test_i = indicies
+            self.model.fit(self.X[train_i], self.y[train_i])
+
+            score = self.model.score(self.X[test_i], self.y[test_i])
+            print('    Fold %i: %f' % (i, score))
+            scores += [score]
+
+            estimates[test_i] = self.predict(self.X[test_i])
+            test[test_i] = False
+
+        scores = np.array(scores)
+
+        if test.any():
+            raise RuntimeError('Estimates check failed, %i failures' % np.sum(test))
+
+        return scores, estimates
 
     def scores(self):
         scores = []

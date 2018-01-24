@@ -159,25 +159,25 @@ class ModelAnalysis():
 
         extended_results = ModelAnalysis.model_results_analysis(
             filtered_data, results, xy,
-            outputs_dir + 'model_estimations.html'
+            outputs_dir + 'model_cv_estimations.html'
         )
 
         if model.HAS_SIMPLE_COEFS:
             ModelAnalysis.save_model_coefs(
                 model, xy,
-                outputs_dir + 'model_coefficients.html'
+                outputs_dir + 'model_non_cv_coefficients.html'
             )
 
-        if model.HAS_FEATURE_IMPORTANCE:
-            ModelAnalysis.save_feature_importance(
-                model, xy,
-                outputs_dir + 'feature_importance.html'
-            )
+        # if model.HAS_FEATURE_IMPORTANCE:
+        #     ModelAnalysis.save_feature_importance(
+        #         model, xy,
+        #         outputs_dir + 'non_cv_feature_importance.html'
+        #     )
 
-        ModelAnalysis.violin_plot(
-            filtered_data, outputs_dir + 'violin_plot.png')
-        ModelAnalysis.scatter_matrix(
-            filtered_data, xy, outputs_dir + 'scatter_matrix.png')
+        # ModelAnalysis.violin_plot(
+        #     filtered_data, outputs_dir + 'violin_plot.png')
+        # ModelAnalysis.scatter_matrix(
+        #     filtered_data, xy, outputs_dir + 'scatter_matrix.png')
         ModelAnalysis.model_accuracy(
             results, scatter_lims, error_density_lims,
             outputs_dir + 'model_accuracy_scatter_plot.png'
@@ -186,24 +186,22 @@ class ModelAnalysis():
             extended_results, scatter_lims, outputs_dir
         )
 
-        print('Mean absolute error: %.2f' % mean_error)
-        print('Average model score: %.2f\n%s' % (scores.mean(), str(scores)))
+        print('Mean absolute cv error: %.2f' % mean_error)
+        print('Average model cv score: %.3f\n%s' % (scores.mean(), str(scores)))
 
     def describe_model_estimations(xy, model_class, output_file, df):
         model = model_class(
             xy.X.values, xy.y.values,
             xy.X.columns.values
         )
-        scores = model.scores()
-        print('Average score: %.3f' % np.mean(scores))
-        model.fit()
-        estimates = model.predict(model.X)
-        mean_absolute_error = model.mean_absolute_error()
+        scores, estimates = model.cv_score_and_predict()
+        print('Average cv score: %.3f' % np.mean(scores))
+        mean_absolute_error = model.mean_absolute_error(estimates)
         results = pd.DataFrame({
             'actuals': xy.y,
-            'estimates': estimates,
-            'error': estimates - xy.y,
-            'mean_error': mean_absolute_error,
+            'cv_estimates': estimates,
+            'cv_error': estimates - xy.y,
+            'cv_mean_error': mean_absolute_error,
         })
 
         description = results.describe()
@@ -227,6 +225,7 @@ class ModelAnalysis():
         return extended_results
 
     def save_model_coefs(model, xy, output_file):
+        model.fit()
         coefs = pd.DataFrame({
             'Coef': pd.Index(['intercept'] + list(xy.X.columns.values)),
             'value': [model.model.intercept_] + list(model.model.coef_)
@@ -234,6 +233,7 @@ class ModelAnalysis():
         DataAnalysis.save_df_as_html(coefs, output_file)
 
     def save_feature_importance(model, xy, output_file):
+        model.fit()
         feature_names = xy.X.columns.values
         raw_feature_importance = model.feature_importance()
 
@@ -270,10 +270,13 @@ class ModelAnalysis():
 
     def model_accuracy(results, scatter_lims, error_density_lims, output_file):
         f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+        ax1.set_ylabel('price')
+        ax1.set_xlabel('model accuracy scatter plot')
         ModelAnalysis.scatter_plt_x_on_axis(ax1, results, scatter_lims)
 
-        density = gaussian_kde(results['error'][results['estimates']>0])
+        density = gaussian_kde(results['cv_error'][results['cv_estimates']>0])
         x = np.linspace(error_density_lims[0], error_density_lims[1], 10000)
+        ax2.set_xlabel('model error density')
         ax2.plot(x, density(x))
 
         plt.savefig(output_file)
@@ -325,17 +328,19 @@ class ModelAnalysis():
         df, column, axes_spec, x_len, scatter_lims, outputs_dir, img_name
     ):
         f, axes = plt.subplots(1, x_len, figsize=(10*x_len, 10))
+        axes[0].set_ylabel('price')
         for value, op, axis_i in axes_spec:
             if op == '=>':
                 x = df[df[column] >= value]
             elif op == '==':
                 x = df[df[column] == value]
+            axes[axis_i].set_xlabel('%s == %s' % (column, str(value)))
             ModelAnalysis.scatter_plt_x_on_axis(axes[axis_i], x, scatter_lims)
         plt.savefig(os.path.join(outputs_dir, img_name))
 
     def scatter_plt_x_on_axis(axis, x, scatter_lims):
-        axis.scatter(x['actuals'], x['estimates'])
-        max_point = x[['actuals', 'estimates']].max().max()
+        axis.scatter(x['actuals'], x['cv_estimates'])
+        max_point = x[['actuals', 'cv_estimates']].max().max()
         axis.plot([0, max_point], [0, max_point])
         axis.set_xlim(scatter_lims)
         axis.set_ylim(scatter_lims)
