@@ -29,7 +29,7 @@ class XY(object):
 
         (('property_type',), 'numerically_encoded'),
         (('suburb',), 'numerically_encoded'),
-        # (('road',), 'numerically_encoded'),
+        (('road',), 'numerically_encoded'),
     ]
 
     ORDINAL_EXCLUDE = 1
