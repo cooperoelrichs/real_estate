@@ -111,4 +111,4 @@ class TestStreetscopeGeocoder(unittest.TestCase):
         r = self.geocoder.geocode_addresses(self.TEST_DF[-1:]).loc[0]
         self.assertTrue(np.isnan(r['latitude']))
         self.assertTrue(np.isnan(r['longitude']))
-        self.assertFalse(r['geocoding_validation'])
+        self.assertEqual(r['geocoding_validation'], self.EXPECTED_RESULTS[-1][2])
