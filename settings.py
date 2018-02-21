@@ -36,6 +36,7 @@ class BasicSettings(Settings):
         self.data_file_with_geocoded_addresses = os.path.join(
             self.data_dir, run_category_settings['data_file_with_geocoded_addresses']
         )
+        self.streetscope_location = self.json['streetscope_location']
 
 
 class AssistantSettings(BasicSettings):
