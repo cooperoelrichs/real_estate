@@ -79,12 +79,35 @@ class StreetscopeGeocoder(Geocoder):
     ]
     RE_SPACE = re.compile(r'\s+')
 
+    def __init__(self, verbose):
+        super().__init__(verbose)
+        self.elasticsearch_server = ElasticsearchServer()
+        self.streetscope_server = StreetscopeServer()
+        self.servers_running = False
+
+    def start_servers(self):
+        self.elasticsearch_server.start()
+        self.streetscope_server.start()
+        self.servers_running = True
+
+    def stop_servers(self):
+        self.elasticsearch_server.stop()
+        self.streetscope_server.stop()
+        self.servers_running = False
+
     def geocode_addresses(self, data):
+        if not self.servers_running:
+            raise RuntimeError('Geocoding servers have not been started.')
+        column_names = ['latitude', 'longitude', 'geocoding_validation']
         coords = pd.DataFrame(
-            columns=['latitude', 'longitude', 'geocoding_validation'],
-            data=list(data[self.INDICIES].apply(self.geocode, raw=True, axis=1).values)
+            columns=column_names,
+            data=list(data[self.INDICIES].apply(self.geocode, raw=True, axis=1).values),
+            index=data.index
         )
-        return coords
+
+        for a in column_names:
+            data[a] = coords[a]
+        return data
 
     def geocode(self, r):
         url = self.mk_url(r)

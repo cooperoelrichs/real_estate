@@ -41,17 +41,12 @@ class TestStreetscopeGeocoder(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
-        self.ess = ElasticsearchServer()
-        self.ess.start()
-        self.sss = StreetscopeServer()
-        self.sss.start()
         self.geocoder = StreetscopeGeocoder(False)
+        self.geocoder.start_servers()
 
     @classmethod
     def tearDownClass(self):
-        self.ess.stop()
-        self.sss.stop()
-        pass
+        self.geocoder.stop_servers()
 
     TEST_DF = pd.DataFrame(
         columns=['house', 'house_number', 'road', 'suburb', 'state', 'postcode'],
@@ -101,14 +96,14 @@ class TestStreetscopeGeocoder(unittest.TestCase):
             self.assertEqual(self.geocoder.mk_url(r[1].values), self.URLS[i])
 
     def test_geocoding(self):
-        coords = self.geocoder.geocode_addresses(self.TEST_DF[:-1])
+        coords = self.geocoder.geocode_addresses(self.TEST_DF[:-1].copy())
         for i, index_row in enumerate(coords.iterrows()):
             _, r = index_row
             results = (r['latitude'], r['longitude'], r['geocoding_validation'])
             self.assertEqual(results, self.EXPECTED_RESULTS[i])
 
     def test_geocoding_failure(self):
-        r = self.geocoder.geocode_addresses(self.TEST_DF[-1:]).loc[0]
+        r = self.geocoder.geocode_addresses(self.TEST_DF[-1:].copy()).iloc[0]
         self.assertTrue(np.isnan(r['latitude']))
         self.assertTrue(np.isnan(r['longitude']))
         self.assertEqual(r['geocoding_validation'], self.EXPECTED_RESULTS[-1][2])
