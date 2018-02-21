@@ -132,7 +132,7 @@ class StreetscopeGeocoder(Geocoder):
         return data
 
     def clean_strings(self, data):
-        for a in ['house', 'house_number']:
+        for a in ['house', 'house_number', 'road', 'suburb']:
             data[a] = data[a].map(self.clean_string)
         return data
 
