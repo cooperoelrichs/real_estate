@@ -5,20 +5,21 @@ import subprocess
 import numpy as np
 import pandas as pd
 
+import json
+
 
 def expontial_backoff(url, current_delay, max_delay):
     while True:
         try:
             response = requests.get(url)
-        except IOError:
-            pass
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            if current_delay > max_delay:
+                raise e
+            time.sleep(current_delay)
+            current_delay *= 2
         else:
             return response
-
-        if current_delay < max_delay:
-            raise Exception('Too many retry attempts.')
-        time.sleep(current_delay)
-        current_delay *= 2
 
 
 class SimpleSubprocess(object):
@@ -41,7 +42,7 @@ class SimpleSubprocess(object):
     def ping(self):
         try:
             requests.get(self.ping_url)
-        except IOError:
+        except requests.exceptions.RequestException as e:
             return False
         else:
             return True
@@ -56,8 +57,8 @@ class ElasticsearchServer(SimpleSubprocess):
 
 
 class StreetscopeServer(SimpleSubprocess):
-    def __init__(self):
-        self.start_command = ('python3', '../../streetscope/streetscope/app.py')
+    def __init__(self, app_location):
+        self.start_command = ('python3', app_location)
         self.ping_url = 'http://localhost:5000/about'
         self.start_up_time = 3
         self.shut_down_time = 1
@@ -79,16 +80,30 @@ class StreetscopeGeocoder(Geocoder):
     ]
     RE_SPACE = re.compile(r'\s+')
 
-    def __init__(self, verbose):
+    def __init__(self, verbose, streetscope_location):
         super().__init__(verbose)
         self.elasticsearch_server = ElasticsearchServer()
-        self.streetscope_server = StreetscopeServer()
+        self.streetscope_server = StreetscopeServer(streetscope_location)
         self.servers_running = False
 
     def start_servers(self):
+        if self.verbose:
+            print('Starting the elasticsearch server.')
         self.elasticsearch_server.start()
+
+        if self.verbose:
+            print('Starting the streetscope server.')
         self.streetscope_server.start()
+
         self.servers_running = True
+
+    def check_servers(self):
+        for name, server in (
+            ('Elasticsearch', self.elasticsearch_server),
+            ('Streetscope', self.streetscope_server),
+        ):
+            if not server.ping():
+                raise RuntimeError("%s server didn't respond." % name)
 
     def stop_servers(self):
         self.elasticsearch_server.stop()
@@ -98,10 +113,17 @@ class StreetscopeGeocoder(Geocoder):
     def geocode_addresses(self, data):
         if not self.servers_running:
             raise RuntimeError('Geocoding servers have not been started.')
-        column_names = ['latitude', 'longitude', 'geocoding_validation']
+        self.start_time = time.time()
+        self.data_len = len(data)
+
+        data = self.clean_strings(data)
+
+        column_names = ['latitude', 'longitude', 'geocoding_is_valid']
         coords = pd.DataFrame(
             columns=column_names,
-            data=list(data[self.INDICIES].apply(self.geocode, raw=True, axis=1).values),
+            data=list(data[self.INDICIES].apply(
+                self.geocode, raw=True, axis=1
+            ).values),
             index=data.index
         )
 
@@ -109,9 +131,25 @@ class StreetscopeGeocoder(Geocoder):
             data[a] = coords[a]
         return data
 
+    def clean_strings(self, data):
+        for a in ['house', 'house_number']:
+            data[a] = data[a].map(self.clean_string)
+        return data
+
+    QUOTES_REGEX = re.compile(r'"|\'|\*|%22')
+    def clean_string(self, x):
+        if isinstance(x, str):
+            x = self.QUOTES_REGEX.sub('', x)
+            return x.strip()
+        else:
+            return x
+
     def geocode(self, r):
+        if r.name % 1000 == 0:
+            self.progress_summary(self.start_time, r.name, self.data_len)
+
         url = self.mk_url(r)
-        result = StreetscopeGeocoder.request(url)
+        result = StreetscopeGeocoder.request(url, r)
         coords = self.process_result(result, r)
         return coords
 
@@ -119,12 +157,15 @@ class StreetscopeGeocoder(Geocoder):
         return (
             'http://localhost:5000/geocode?query=' +
             self.RE_SPACE.sub('+', '+'.join(filter(None.__ne__, map(
-                lambda x: None if x[0] is None else str(x[0]) + x[1],
-                zip(r, ('/', '', ',', ',', '', ''))
-            ))))
+                lambda x:
+                    None
+                    if (pd.isnull(x[0]) or len(x[0])==0)
+                    else str(x[0]) + x[1],
+                zip(r[:-1], ('/', '', ',', ',', ''))
+            )))) + '+%.0f' % r[-1]
         )
 
-    def request(url):
+    def request(url, r):
         return expontial_backoff(url, 0.1, 5).json()
 
     def process_result(self, result, row):
@@ -144,15 +185,23 @@ class StreetscopeGeocoder(Geocoder):
             if len(matching_hits) == 0:
                 others = ', '.join(x['_source']['NUMBER'] for x in hits)
                 if self.verbose:
-                    print('No matches: %s - %s' % (row['house_number'], others))
+                    match = self.street_number_processing(row['house_number'])
+                    print(
+                        'No matches: %s|%s (%s) - %s' %
+                        (match.group(1), match.group(2),
+                         row['house_number'], others)
+                    )
                 return [np.NaN, np.NaN, False]
 
             hit = matching_hits[0]['_source']
-            return [float(hit['X']), float(hit['Y']), self.check_hit(hit, row)]
+            return [float(hit['Y']), float(hit['X']), self.check_hit(hit, row)]
 
     ST_NO_REGEX = re.compile(r'.*/+\s*([^/]*)\s*|\s*([^/]*)\s*')
+    def street_number_processing(self, x):
+        return self.ST_NO_REGEX.match(str(x).lower())
+
     def filter_matches(self, a, b):
-        match = self.ST_NO_REGEX.match(str(b).lower())
+        match = self.street_number_processing(b)
         return str(a).lower() == (match.group(1) or match.group(2))
 
     STATE_CONVERSION = {
@@ -185,39 +234,17 @@ class StreetscopeGeocoder(Geocoder):
                 return False
             return True
 
-
-    # Notes:
-    # - start this code afresh because it will need to be fast and reliable;
-    # - this will require some thorough tests of the results returned by
-    #   streetscope to ensure we have the correct location.
-
-# {
-#     'total': 3096387, 'max_score': 31.961416,
-#     'hits': [
-#         {
-#             '_score': 31.961416, '_type': 'address', '_id': '14190144',
-#             '_source': {
-#                 'Y': '-33.87358000',
-#                 'POSTCODE': '6450',
-#                 'ADDRESS': '1 MILLS PLACE, WEST BEACH, WA 6450',
-#                 'ACCURACY': '2',
-#                 'STREET': 'MILLS PLACE',
-#                 'CITY': 'WEST BEACH',
-#                 'X': '121.88093000',
-#                 'NUMBER': '1',
-#                 'REGION': 'WA',
-#                 'UNIT': ''
-#             },
-#             '_index': 'addresses'
-#         },
-#         {'_score': 29.131023, '_type': 'address', '_id': '1399606', '_source': {'Y': '-33.87302885', 'POSTCODE': '6450', 'ADDRESS': '12 MILLS PLACE, WEST BEACH, WA 6450', 'ACCURACY': '2', 'STREET': 'MILLS PLACE', 'CITY': 'WEST BEACH', 'X': '121.88020744', 'NUMBER': '12', 'REGION': 'WA', 'UNIT': ''}, '_index': 'addresses'},
-#         {'_score': 29.116383, '_type': 'address', '_id': '12541702', '_source': {'Y': '-33.87379000', 'POSTCODE': '6450', 'ADDRESS': '7 MILLS PLACE, WEST BEACH, WA 6450', 'ACCURACY': '2', 'STREET': 'MILLS PLACE', 'CITY': 'WEST BEACH', 'X': '121.87985000', 'NUMBER': '7', 'REGION': 'WA', 'UNIT': ''}, '_index': 'addresses'},
-#         {'_score': 29.101917, '_type': 'address', '_id': '1382993', '_source': {'Y': '-33.87357000', 'POSTCODE': '6450', 'ADDRESS': '4 MILLS PLACE, WEST BEACH, WA 6450', 'ACCURACY': '2', 'STREET': 'MILLS PLACE', 'CITY': 'WEST BEACH', 'X': '121.88044000', 'NUMBER': '4', 'REGION': 'WA', 'UNIT': ''}, '_index': 'addresses'},
-#         {'_score': 29.101917, '_type': 'address', '_id': '6868527', '_source': {'Y': '-33.87329000', 'POSTCODE': '6450', 'ADDRESS': '9 MILLS PLACE, WEST BEACH, WA 6450', 'ACCURACY': '2', 'STREET': 'MILLS PLACE', 'CITY': 'WEST BEACH', 'X': '121.87978000', 'NUMBER': '9', 'REGION': 'WA', 'UNIT': ''}, '_index': 'addresses'},
-#         {'_score': 29.101917, '_type': 'address', '_id': '9212178', '_source': {'Y': '-33.87302000', 'POSTCODE': '6450', 'ADDRESS': '10 MILLS PLACE, WEST BEACH, WA 6450', 'ACCURACY': '2', 'STREET': 'MILLS PLACE', 'CITY': 'WEST BEACH', 'X': '121.87979000', 'NUMBER': '10', 'REGION': 'WA', 'UNIT': ''}, '_index': 'addresses'},
-#         {'_score': 29.101917, '_type': 'address', '_id': '11239951', '_source': {'Y': '-33.87382000', 'POSTCODE': '6450', 'ADDRESS': '6 MILLS PLACE, WEST BEACH, WA 6450', 'ACCURACY': '2', 'STREET': 'MILLS PLACE', 'CITY': 'WEST BEACH', 'X': '121.88006000', 'NUMBER': '6', 'REGION': 'WA', 'UNIT': ''}, '_index': 'addresses'},
-#         {'_score': 29.09885, '_type': 'address', '_id': '3102971', '_source': {'Y': '-33.87335000', 'POSTCODE': '6450', 'ADDRESS': '3 MILLS PLACE, WEST BEACH, WA 6450', 'ACCURACY': '2', 'STREET': 'MILLS PLACE', 'CITY': 'WEST BEACH', 'X': '121.88063000', 'NUMBER': '3', 'REGION': 'WA', 'UNIT': ''}, '_index': 'addresses'},
-#         {'_score': 29.09885, '_type': 'address', '_id': '3016846', '_source': {'Y': '-33.87308501', 'POSTCODE': '6450', 'ADDRESS': '2 MILLS PLACE, WEST BEACH, WA 6450', 'ACCURACY': '4', 'STREET': 'MILLS PLACE', 'CITY': 'WEST BEACH', 'X': '121.88077521', 'NUMBER': '2', 'REGION': 'WA', 'UNIT': ''}, '_index': 'addresses'},
-#         {'_score': 29.09885, '_type': 'address', '_id': '9951118', '_source': {'Y': '-33.87260000', 'POSTCODE': '6450', 'ADDRESS': '15 MILLS PLACE, WEST BEACH, WA 6450', 'ACCURACY': '2', 'STREET': 'MILLS PLACE', 'CITY': 'WEST BEACH', 'X': '121.88002000', 'NUMBER': '15', 'REGION': 'WA', 'UNIT': ''}, '_index': 'addresses'}
-#     ]
-# }
+    def progress_summary(self, start_time, current_row, file_length):
+        if current_row != 0:
+            elapsed_time = time.time() - start_time
+            frac_complete = current_row/file_length
+            est_time = min(elapsed_time * (1/frac_complete - 1), 8640000)
+            print(
+                '%.3f, %i addresses indexed, elapsed time %s, est. time remaining %s'
+                % (
+                    frac_complete,
+                    current_row,
+                    time.strftime('%H:%M:%S', time.gmtime(elapsed_time)),
+                    time.strftime('%H:%M:%S', time.gmtime(est_time))
+                )
+            )
