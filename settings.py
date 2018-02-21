@@ -33,6 +33,9 @@ class BasicSettings(Settings):
         self.data_file_with_addresses = os.path.join(
             self.data_dir, run_category_settings['data_file_with_addresses']
         )
+        self.data_file_with_geocoded_addresses = os.path.join(
+            self.data_dir, run_category_settings['data_file_with_geocoded_addresses']
+        )
 
 
 class AssistantSettings(BasicSettings):
