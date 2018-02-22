@@ -8,13 +8,16 @@ import pandas as pd
 import json
 
 
-def expontial_backoff(url, current_delay, max_delay):
+def expontial_backoff(url, current_delay, max_delay, err_str=None):
     while True:
         try:
             response = requests.get(url)
             response.raise_for_status()
         except requests.exceptions.RequestException as e:
             if current_delay > max_delay:
+                print('Max retry delay exceeded. Printing error comment:')
+                if err_str is not None:
+                    print(err_str)
                 raise e
             time.sleep(current_delay)
             current_delay *= 2
@@ -117,8 +120,8 @@ class StreetscopeGeocoder(Geocoder):
         self.data_len = len(data)
 
         data = self.clean_strings(data)
-
         column_names = ['latitude', 'longitude', 'geocoding_is_valid']
+
         coords = pd.DataFrame(
             columns=column_names,
             data=list(data[self.INDICIES].apply(
@@ -136,7 +139,7 @@ class StreetscopeGeocoder(Geocoder):
             data[a] = data[a].map(self.clean_string)
         return data
 
-    QUOTES_REGEX = re.compile(r'"|\'|\*|%22')
+    QUOTES_REGEX = re.compile(r'"|\'|\*|%22|\^')
     def clean_string(self, x):
         if isinstance(x, str):
             x = self.QUOTES_REGEX.sub('', x)
@@ -166,13 +169,14 @@ class StreetscopeGeocoder(Geocoder):
         )
 
     def request(url, r):
-        return expontial_backoff(url, 0.1, 5).json()
+        return expontial_backoff(url, 0.1, 5, str(r)).json()
 
+    NO_COORDS = [np.NaN, np.NaN, False]
     def process_result(self, result, row):
         if result['total'] == 0:
             if self.verbose:
                 print('No results.')
-            return None
+            return self.NO_COORDS
         else:
             hits = result['hits']
             matching_hits = list(filter(
@@ -191,7 +195,7 @@ class StreetscopeGeocoder(Geocoder):
                         (match.group(1), match.group(2),
                          row['house_number'], others)
                     )
-                return [np.NaN, np.NaN, False]
+                return self.NO_COORDS
 
             hit = matching_hits[0]['_source']
             return [float(hit['Y']), float(hit['X']), self.check_hit(hit, row)]
@@ -240,7 +244,7 @@ class StreetscopeGeocoder(Geocoder):
             frac_complete = current_row/file_length
             est_time = min(elapsed_time * (1/frac_complete - 1), 8640000)
             print(
-                '%.3f, %i addresses indexed, elapsed time %s, est. time remaining %s'
+                '%.3f, %i addresses processed, elapsed time %s, est. time remaining %s'
                 % (
                     frac_complete,
                     current_row,
