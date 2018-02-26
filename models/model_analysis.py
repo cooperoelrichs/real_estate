@@ -36,23 +36,23 @@ class ModelAnalysis():
             outputs_dir
         )
 
-    def make_xy(data, xy_class):
+    def make_xy(data, xy_class, only_valid_geocoding):
         return xy_class(
             data, xy_class.GENERIC_X_SPEC,
             exclude_suburb=False,
             filter_on_suburb_population=True,
-            only_valid_geocoding=True
+            only_valid_geocoding=only_valid_geocoding
         )
 
     def test_a_set_of_model_params(
         data_file_path, file_type, xy_class, model_class,
-        base_params, mod_names, mod_values, outputs_dir, post_fix=None,
-        log=False
+        base_params, mod_names, mod_values, outputs_dir, only_valid_geocoding,
+        post_fix=None, log=False
     ):
         print('Testing %i combinations.\n' % len(mod_values))
 
         data = DataStorer.read_ft(file_type, data_file_path)
-        xy = ModelAnalysis.make_xy(data, xy_class)
+        xy = ModelAnalysis.make_xy(data, xy_class, only_valid_geocoding)
 
         print(xy.X.columns)
         print(xy.X.shape)
