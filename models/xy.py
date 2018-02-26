@@ -28,7 +28,7 @@ class XY(object):
         # (('suburb',), 'categorical')
 
         (('property_type',), 'numerically_encoded'),
-        (('suburb',), 'numerically_encoded'),
+        # (('suburb',), 'numerically_encoded'),
         # (('road',), 'numerically_encoded'),
 
         (('latitude',), 'continuous'),
