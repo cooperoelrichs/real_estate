@@ -29,7 +29,10 @@ class XY(object):
 
         (('property_type',), 'numerically_encoded'),
         (('suburb',), 'numerically_encoded'),
-        (('road',), 'numerically_encoded'),
+        # (('road',), 'numerically_encoded'),
+
+        (('latitude',), 'continuous'),
+        (('longitude',), 'continuous'),
     ]
 
     ORDINAL_EXCLUDE = 1
@@ -44,17 +47,18 @@ class XY(object):
         'garage_spaces': 0,
     }
 
-    MINIMUM_SUBURB_POPULATION = 100
+    MINIMUM_SUBURB_POPULATION = 20  # 100
     # VALID_SUBURBS_LIST = None  # Make this
 
     def setup_self(
         self, df, x_spec, exclude_suburb, perform_merges,
-        filter_on_suburb_population
+        filter_on_suburb_population, only_valid_geocoding
     ):
         self.x_spec = x_spec
         self.exclude_suburb = exclude_suburb
         self.perform_merges = perform_merges
         self.filter_on_suburb_population = filter_on_suburb_population
+        self.only_valid_geocoding = only_valid_geocoding
         df = self.filter_data(df)
 
         if self.perform_merges:
@@ -84,6 +88,13 @@ class XY(object):
     def filter_data(self, df):
         df = self.invalid_data_filter(df)
         df = self.qc_data_filter(df)
+
+        if self.filter_on_suburb_population:
+            df = df[df['geocoding_is_valid']]
+        if self.filter_on_suburb_population:
+            df = df[XY.minimum_suburb_population_filter(
+                df, self.MINIMUM_SUBURB_POPULATION
+            )]
         return df
 
     def generaly_invalid_data_filter(self, df):
@@ -309,11 +320,12 @@ class XY(object):
 class SalesXY(XY):
     def __init__(
         self, df, x_spec, exclude_suburb=False, perform_merges=True,
-        filter_on_suburb_population=False
+        filter_on_suburb_population=False,
+        only_valid_geocoding=False
     ):
         self.setup_self(
             df, x_spec, exclude_suburb, perform_merges,
-            filter_on_suburb_population
+            filter_on_suburb_population, only_valid_geocoding
         )
 
     def invalid_data_filter(self, df):
@@ -322,10 +334,6 @@ class SalesXY(XY):
             self.invalid_sale_data_filter(df) &
             self.generaly_invalid_data_filter(df)
         ]
-        if self.filter_on_suburb_population:
-            df = df[XY.minimum_suburb_population_filter(
-                df, self.MINIMUM_SUBURB_POPULATION
-            )]
         return df
 
     def invalid_sale_data_filter(self, df):
@@ -346,11 +354,12 @@ class SalesXY(XY):
 class RentalsXY(XY):
     def __init__(
         self, df, x_spec, exclude_suburb=False, perform_merges=True,
-        filter_on_suburb_population=False
+        filter_on_suburb_population=False,
+        only_valid_geocoding=False
     ):
         self.setup_self(
             df, x_spec, exclude_suburb, perform_merges,
-            filter_on_suburb_population
+            filter_on_suburb_population, only_valid_geocoding
         )
 
     def invalid_data_filter(self, df):
@@ -359,10 +368,6 @@ class RentalsXY(XY):
             self.invalid_rental_data_filter(df) &
             self.generaly_invalid_data_filter(df)
         ]
-        if self.filter_on_suburb_population:
-            df = df[XY.minimum_suburb_population_filter(
-                df, self.MINIMUM_SUBURB_POPULATION
-            )]
         return df
 
     def invalid_rental_data_filter(self, df):

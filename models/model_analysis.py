@@ -38,8 +38,10 @@ class ModelAnalysis():
 
     def make_xy(data, xy_class):
         return xy_class(
-            data, xy_class.GENERIC_X_SPEC, exclude_suburb=False,
-            filter_on_suburb_population=True
+            data, xy_class.GENERIC_X_SPEC,
+            exclude_suburb=False,
+            filter_on_suburb_population=True,
+            only_valid_geocoding=True
         )
 
     def test_a_set_of_model_params(
@@ -51,6 +53,9 @@ class ModelAnalysis():
 
         data = DataStorer.read_ft(file_type, data_file_path)
         xy = ModelAnalysis.make_xy(data, xy_class)
+
+        print(xy.X.columns)
+        print(xy.X.shape)
 
         if log:
             log_file = ModelAnalysis.prep_logging(outputs_dir, base_params, post_fix)
