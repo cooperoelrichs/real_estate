@@ -7,22 +7,22 @@ class GBTrees(PriceModel):
     HAS_FEATURE_IMPORTANCE = True
 
     PARAMS = {
-        # max_depth 30, learning_rate 0.040, n_estimators 2000, reg_lambda 10: 0.637
+        # max_depth 60, learning_rate 0.010, n_estimators 3000, reg_lambda 10: 0.743
         'booster': 'gbtree',
-        'max_depth': 30,  # 3
-        'learning_rate': 0.04,  # 0.1
-        'n_estimators': 2000,  # 100
+        'max_depth': 60,
+        'learning_rate': 0.01,
+        'n_estimators': 3000,
         'silent': True,
         'objective': 'reg:linear',
-        'n_jobs': 6,  # -1
-        'gamma': 0,  # 0
-        'min_child_weight': 4,  # 1
+        'n_jobs': 6,
+        'gamma': 0,
+        'min_child_weight': 4,
         'max_delta_step': 0,
-        'subsample': 0.5,  # 1
-        'colsample_bytree': 1,  # 1
+        'subsample': 0.5,
+        'colsample_bytree': 1,
         'colsample_bylevel': 1,
-        'reg_alpha': 0,  # L1 regularization parameter
-        'reg_lambda': 10,  # L2 regularization parameter
+        'reg_alpha': 1,
+        'reg_lambda': 10,
         'scale_pos_weight': 1,
         'base_score': 0.5,
         'seed': 0,
