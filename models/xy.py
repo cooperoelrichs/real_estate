@@ -320,8 +320,8 @@ class XY(object):
 class SalesXY(XY):
     def __init__(
         self, df, x_spec, exclude_suburb=False, perform_merges=True,
-        filter_on_suburb_population=False,
-        only_valid_geocoding=False
+        filter_on_suburb_population=True,
+        only_valid_geocoding=True
     ):
         self.setup_self(
             df, x_spec, exclude_suburb, perform_merges,
@@ -354,8 +354,8 @@ class SalesXY(XY):
 class RentalsXY(XY):
     def __init__(
         self, df, x_spec, exclude_suburb=False, perform_merges=True,
-        filter_on_suburb_population=False,
-        only_valid_geocoding=False
+        filter_on_suburb_population=True,
+        only_valid_geocoding=True
     ):
         self.setup_self(
             df, x_spec, exclude_suburb, perform_merges,
