@@ -25,10 +25,10 @@ class ModelAnalysis():
         data_file_path, file_type,
         xy_class, model_class,
         scatter_lims, error_density_lims,
-        outputs_dir
+        outputs_dir, only_valid_geocoding
     ):
         data = DataStorer.read_ft(file_type, data_file_path)
-        xy = ModelAnalysis.make_xy(data, xy_class)
+        xy = ModelAnalysis.make_xy(data, xy_class, only_valid_geocoding)
 
         ModelAnalysis.model_analysis(
             data, xy,
