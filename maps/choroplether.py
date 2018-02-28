@@ -6,6 +6,7 @@ from matplotlib.collections import PatchCollection
 from matplotlib.colors import (Normalize, LinearSegmentedColormap)
 from matplotlib import patheffects
 from mpl_toolkits.basemap import Basemap
+import geopandas  # Must be imported after basemap or shapely breaks.
 from shapely.geometry import shape
 from shapely.ops import transform
 from descartes import PolygonPatch
@@ -17,6 +18,11 @@ class Choroplether():
     EPSG_4283_APPROXIMATION = {
         'projection': 'merc',
         'ellps': 'WGS84'
+    }
+
+    BBOX_AUSTRALIA = {
+        'll_cnr': (112, -44),
+        'ru_cnr': (154, -10),
     }
 
     POLYGON_ALPHA = 1  # 0.5
@@ -260,9 +266,15 @@ class Choroplether():
         return r
 
     def make_a_basemap(ax, ll_cnr, ru_cnr):
+        return new_basemap(
+            ax, ll_cnr, ru_cnr,
+            Choroplether.EPSG_4283_APPROXIMATION
+        )
+
+    def new_basemap(ax, ll_cnr, ru_cnr, projection_system):
         bm = Basemap(
-            projection=Choroplether.EPSG_4283_APPROXIMATION['projection'],
-            ellps=Choroplether.EPSG_4283_APPROXIMATION['ellps'],
+            projection=projection_system['projection'],
+            ellps=projection_system['ellps'],
             lon_0=(ru_cnr[0] - ll_cnr[0]) / 2,
             lat_0=(ru_cnr[1] - ll_cnr[1]) / 2,
             llcrnrlon=ll_cnr[0],
