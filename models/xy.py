@@ -31,8 +31,8 @@ class XY(object):
         # (('suburb',), 'numerically_encoded'),
         # (('road',), 'numerically_encoded'),
 
-        (('latitude',), 'continuous'),
-        (('longitude',), 'continuous'),
+        (('X',), 'continuous'),  # longitude
+        (('Y',), 'continuous'),  # latitude
     ]
 
     ORDINAL_EXCLUDE = 1
