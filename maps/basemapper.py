@@ -33,8 +33,8 @@ class Basemapper():
         )
         return bmap
 
-    def add_img_to_basemap(bmap, img):
-        bmap.imshow(img, interpolation='lanczos', origin='upper')
+    def add_img_to_basemap(bmap, img, alpha=1):
+        bmap.imshow(img, interpolation='lanczos', origin='upper', alpha=alpha)
         return bmap
 
     def add_attribution(ax, text):
@@ -47,10 +47,10 @@ class Basemapper():
             transform=ax.transAxes
         )
 
-    def dl_tiles(bbox, provider_name):
+    def dl_tiles(bbox, provider_name, zoom):
         bm_image = providerless_geotiler.MapPlus(
             provider_spec=Basemapper.PROVIDERS[provider_name],
-            zoom=11,
+            zoom=zoom,
             extent=(
                 bbox['ll_cnr'][0], bbox['ll_cnr'][1],
                 bbox['ru_cnr'][0], bbox['ru_cnr'][1]

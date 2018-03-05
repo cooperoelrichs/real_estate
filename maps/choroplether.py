@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import numpy as np
 # import matplotlib.pyplot as plt
@@ -18,11 +20,6 @@ class Choroplether():
     EPSG_4283_APPROXIMATION = {
         'projection': 'merc',
         'ellps': 'WGS84'
-    }
-
-    BBOX_AUSTRALIA = {
-        'll_cnr': (112, -44),
-        'ru_cnr': (154, -10),
     }
 
     POLYGON_ALPHA = 1  # 0.5
@@ -108,7 +105,7 @@ class Choroplether():
         Choroplether.save_map(plot_thing, outputs_dir, img_title)
 
     def save_map(plot_thing, outputs_dir, img_title):
-        figure_file_name = outputs_dir + 'map-%s.png' % img_title
+        figure_file_name = os.path.join(outputs_dir, 'map-%s.png' % img_title)
         print('Saving: %s' % figure_file_name)
         plot_thing.savefig(
             figure_file_name, dpi=Choroplether.PLOT_DPI, alpha=True,
@@ -297,6 +294,7 @@ class Choroplether():
         mappable = cm.ScalarMappable(cmap=cmap)
         mappable.set_array([])
         mappable.set_clim(-0.5, ncolors+0.5)
+        print(plot_thing)
         color_bar = plot_thing.colorbar(
             mappable,
             ax=colourbar_ax,
