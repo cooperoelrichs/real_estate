@@ -15,6 +15,12 @@ class Settings(object):
         os.makedirs(dir_path, exist_ok=True)
 
 
+class GeoSettings(Settings):
+    def __init__(self, settings_file_path, run_dir):
+        super().__init__(os.path.join(run_dir, settings_file_path))
+        self.bounding_boxes = self.json['bounding_boxes']
+
+
 class BasicSettings(Settings):
     def __init__(self, run_category, settings_file_path, run_dir, verbose):
         super().__init__(os.path.join(run_dir, settings_file_path))
