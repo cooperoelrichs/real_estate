@@ -32,6 +32,7 @@ class BasicSettings(Settings):
         self.outputs_dir = os.path.join(self.run_dir, self.json['outputs_dir'])
         self.make_dir_unless_exists(self.data_dir)
         self.make_dir_unless_exists(self.html_dir)
+        self.geo_data_dir = self.json['geo_data_dir']
 
         run_category_settings = self.json['run_category_settings'][run_category]
         self.data_file_type = run_category_settings['data_file_type']
