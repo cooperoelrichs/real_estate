@@ -4,6 +4,7 @@ from itertools import product
 import numpy as np
 
 from real_estate.maps.choroplether import Choroplether
+from real_estate.maps.mapper import Mapper
 from real_estate.maps.basemapper import Basemapper
 
 
@@ -18,7 +19,8 @@ class LocationEffects():
         xs = LocationEffects.interpolate(ll[0], ru[0], resolution[0])
         ys = LocationEffects.interpolate(ll[1], ru[1], resolution[1])
         X, Y = np.meshgrid(xs, ys)
-        return X, Y, resolution
+        points = np.array((X.flatten(), Y.flatten()))
+        return points, resolution
 
     def project(basemap, point):
         longitude, latitude = point
@@ -49,17 +51,18 @@ class LocationEffects():
 
     def color_map(
         name, property_type, model, prop,
-        plt, bbox, bmap,
+        plt, bbox, bmap, boundaries,
         settings,
         limits, resolution
     ):
         bm_img = Basemapper.dl_tiles(bbox, 'carto-lite-no-labels', 13)
         Basemapper.add_img_to_basemap(bmap, bm_img)
-        X, Y, resolution = LocationEffects.gen_coord_grid(
+        points, resolution = LocationEffects.gen_coord_grid(
             bbox, bmap, resolution
         )
+        points = Mapper.to_points(points)
         prices = LocationEffects.estimate_prices(
-            X.flatten(), Y.flatten(),
+            points['X'], points['Y'],
             model, prop, resolution
         )
 
@@ -67,19 +70,14 @@ class LocationEffects():
         prices[prices < limits[0]] = limits[0]
         prices[prices > limits[1]] = limits[1]
         contour_plot = plt.contourf(
-            X, Y, prices.reshape((resolution[1], resolution[0])),
+            points['X'].reshape((resolution[1], resolution[0])),
+            points['Y'].reshape((resolution[1], resolution[0])),
+            prices.reshape((resolution[1], resolution[0])),
             50,
-            # [-1, -0.1, 0, 0.1],
             alpha=0.5,
-            cmap=cmap_name,  # plt.cm.bone,
-            # vmin=limits[0],
-            # vmax=limits[1],
+            cmap=cmap_name,
             linewidths=None,
-            # edgecolors='none',
-            # edgecolors=None,
-            # linewidth=0,
             antialiased=True,
-            # origin='lower'
         )
 
         delta = int(1e5)
@@ -91,14 +89,6 @@ class LocationEffects():
             plt, len(labels), plt.get_cmap(cmap_name), labels, None
         )
         colorbar.ax.tick_params(labelsize=8)
-
-        # plt.colorbar(
-        #     contour_plot,
-        #     aspect=30,
-        #     shrink=0.5,
-        #     ticks=
-        # )
-
         Choroplether.save_map(
             plt, os.path.join(settings.outputs_dir, name),
             'location_effect_plot-%s' % property_type

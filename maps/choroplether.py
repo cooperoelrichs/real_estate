@@ -234,9 +234,9 @@ class Choroplether():
             alpha=Choroplether.POLYGON_ALPHA
         )
 
-    def make_polygon_patches(shapes, fc, ec, lw, alpha):
+    def make_polygon_patches(shapes, fc, ec, lw, alpha, fill):
         return shapes.map(
-            lambda x: PolygonPatch(x, fc=fc, ec=ec, lw=lw, alpha=alpha)
+            lambda x: PolygonPatch(x, fc=fc, ec=ec, lw=lw, alpha=alpha, fill=fill)
         )
 
     def add_a_colour_bar(plot_thing, breaks, df, cmap, colourbar_ax, labels_str):
@@ -294,7 +294,6 @@ class Choroplether():
         mappable = cm.ScalarMappable(cmap=cmap)
         mappable.set_array([])
         mappable.set_clim(-0.5, ncolors+0.5)
-        print(plot_thing)
         color_bar = plot_thing.colorbar(
             mappable,
             ax=colourbar_ax,

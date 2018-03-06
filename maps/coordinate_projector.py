@@ -1,8 +1,5 @@
 import pandas as pd
 
-from shapely.ops import transform
-from shapely.geometry import shape
-
 
 class Projector():
     def project_coordinates(df, basemap):
