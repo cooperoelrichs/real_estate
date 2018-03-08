@@ -18,12 +18,6 @@ class PriceModel(object):
         # self.df = df
         # self.seed = 1
 
-    def fit(self):
-        self.model.fit(self.X, self.y)
-
-    def predict(self, X_pred):
-        return self.model.predict(X_pred)
-
     def mean_absolute_error(self, y_pred):
         return mean_absolute_error(y_true=self.y, y_pred=y_pred)
 
@@ -33,13 +27,11 @@ class PriceModel(object):
         test = np.ones_like(self.y, dtype=bool)
         for i, indicies in enumerate(KFold(n=self.X.shape[0], n_folds=self.N_FOLDS)):
             train_i, test_i = indicies
-            self.model.fit(self.X[train_i], self.y[train_i])
-
-            score = self.model.score(self.X[test_i], self.y[test_i])
+            score = self.score(train_i, test_i)
             print('    Fold %i: %f' % (i, score))
             scores += [score]
 
-            estimates[test_i] = self.predict(self.X[test_i])
+            estimates[test_i] = self.model.predict(self.X[test_i])
             test[test_i] = False
 
         scores = np.array(scores)
@@ -73,8 +65,8 @@ class PriceModel(object):
 
     def score_with_id_filter(self, train_i, test_i):
         id_filter = self.identifiability_filter(self.X[train_i])
-        self.model.fit(self.X[:, id_filter][train_i], self.y[train_i])
-        score = self.model.score(self.X[:, id_filter][test_i], self.y[test_i])
+        self.fit(self.X[:, id_filter][train_i], self.y[train_i])
+        score = self.score(self.X[:, id_filter][test_i], self.y[test_i])
         return score
 
     def identifiability_filter(self, X_subset):
