@@ -3,6 +3,7 @@ from real_estate.models.price_model import PriceModel
 
 
 class GBTrees(PriceModel):
+    MODEL_CLASS = xgb.XGBRegressor
     HAS_SIMPLE_COEFS = False
     HAS_FEATURE_IMPORTANCE = True
 
@@ -30,14 +31,7 @@ class GBTrees(PriceModel):
     }
 
     def __init__(self, X, y, X_labels, params=None):
-        if params == None:
-            self.model = GBTrees.make_model(self.PARAMS)
-        else:
-            self.model = GBTrees.make_model(params)
-        self.setup_self(X, y, X_labels)
-
-    def make_model(params):
-        return xgb.XGBRegressor(**params)
+        super().__init__(X, y, X_labels, params)
 
     def feature_importance(self):
         return self.model.feature_importances_

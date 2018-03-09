@@ -6,8 +6,13 @@ from sklearn.metrics import mean_absolute_error
 class PriceModel(object):
     N_FOLDS = 3
 
-    def __init__(self):
-        raise NotImplementedError()
+    def __init__(self, X, y, X_labels, params):
+        if params == None:
+            self.model = self.MODEL_CLASS(**self.PARAMS)
+        else:
+            self.model = self.MODEL_CLASS(**params)
+
+        self.setup_self(X, y, X_labels)
 
     def setup_self(self, X, y, X_labels):
         self.X = X
