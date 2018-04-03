@@ -20,6 +20,7 @@ from real_estate.models.model_spec_optimisation_plotter import (
 
 class ModelAnalysis():
     MAXIMUM_NUMBER_OF_RESULTS_TO_SAVE = 10**3
+    DATE_COLUMN = 'last_encounted'
 
     def run(
         data_file_path, file_type,
@@ -90,7 +91,7 @@ class ModelAnalysis():
             print(x)
 
         f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
-        ModelAnalysis.scatter_plt_x_on_axis(ax1, results, scatter_lims)
+        ModelAnalysis.scatter_plt_actuals_v_estimates(ax1, results, scatter_lims)
         plt.savefig(output_file)
 
     def modify_params(params, param_mods):
@@ -162,9 +163,11 @@ class ModelAnalysis():
             filtered_data
         )
 
-        extended_results = ModelAnalysis.model_results_analysis(
-            filtered_data, results, xy,
-            outputs_dir + 'model_cv_estimations.html'
+        extended_results = ModelAnalysis.extend_results(
+            filtered_data, results, xy
+        )
+        ModelAnalysis.model_results_analysis(
+            extended_results, outputs_dir + 'model_cv_estimations.html'
         )
 
         if model.HAS_SIMPLE_COEFS:
@@ -194,6 +197,22 @@ class ModelAnalysis():
         print('Mean absolute cv error: %.2f' % mean_error)
         print('Average model cv score: %.3f\n%s' % (scores.mean(), str(scores)))
 
+    def extend_results(filtered_data, results, xy, include_date):
+        extended_results = pd.concat(
+            [filtered_data[XY.reduce_tuples(
+                [a for a, _ in xy.GENERIC_X_SPEC]
+            )], results],
+            axis=1, ignore_index=False
+        )
+
+        if include_date:
+            extended_results['date'] = filtered_data[ModelAnalysis.DATE_COLUMN]
+
+        extended_results = extended_results.loc[
+            :, ~ extended_results.columns.duplicated('first')
+        ]
+        return extended_results
+
     def describe_model_estimations(xy, model_class, output_file, df):
         model = model_class(
             xy.X.values, xy.y.values,
@@ -213,21 +232,11 @@ class ModelAnalysis():
         DataAnalysis.save_df_as_html(description, output_file)
         return results, model, scores, mean_absolute_error
 
-    def model_results_analysis(filtered_data, results, xy, output_file):
-        extended_results = pd.concat(
-            [filtered_data[XY.reduce_tuples(
-                [a for a, _ in xy.GENERIC_X_SPEC]
-            )], results],
-            axis=1, ignore_index=False
-        )
-        extended_results = extended_results.loc[
-            :, ~ extended_results.columns.duplicated('first')
-        ]
+    def model_results_analysis(extended_results, output_file):
         DataAnalysis.save_df_as_html(
             extended_results[:ModelAnalysis.MAXIMUM_NUMBER_OF_RESULTS_TO_SAVE],
             output_file
         )
-        return extended_results
 
     def save_model_coefs(model, xy, output_file):
         model.fit()
@@ -277,7 +286,7 @@ class ModelAnalysis():
         f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
         ax1.set_ylabel('price')
         ax1.set_xlabel('model accuracy scatter plot')
-        ModelAnalysis.scatter_plt_x_on_axis(ax1, results, scatter_lims)
+        ModelAnalysis.scatter_plt_actuals_v_estimates(ax1, results, scatter_lims)
 
         density = gaussian_kde(results['cv_error'][results['cv_estimates']>0])
         x = np.linspace(error_density_lims[0], error_density_lims[1], 10000)
@@ -286,66 +295,129 @@ class ModelAnalysis():
 
         plt.savefig(output_file)
 
-    def model_accuracy_by_feature(
-        df, scatter_lims, outputs_dir
+    def plot_errors_by_time(
+        df, price_range, error_range, outputs_dir
     ):
-        plots = (
-            ('bedrooms', 'num', (1, 8)),
-            ('garage_spaces', 'num', (1, 8)),
-            ('bathrooms', 'num', (1, 8)),
-            ('property_type', 'cat', 'all'),
-            # ('suburb', 'cat', 'all'),
+        for img_name, y in (
+            ('norm_errors_by_time.png', ModelAnalysis.normalised_error(df)),
+            ('abs_errors_by_time.png', df['cv_error'])
+        ):
+            f, axis = plt.subplots(1, 1, figsize=(20, 10))
+            axis.set_ylabel('price')
+            axis.set_xlabel('model accuracy scatter plot')
+
+            axis.plot(df['date'], y, '.')
+            # axis.set_ylim(error_range)
+
+            plt.savefig(os.path.join(outputs_dir, img_name))
+
+    ACCURACY_BY_FEATURE_PLOTS = (
+        ('bedrooms', 'num', (1, 8)),
+        ('garage_spaces', 'num', (1, 8)),
+        ('bathrooms', 'num', (1, 8)),
+        ('property_type', 'cat', 'all'),
+        # ('suburb', 'cat', 'all'),
+    )
+
+    def normalised_model_accuracy_by_feature(df, price_r, error_r, outputs_dir):
+        df['normalised_error'] = ModelAnalysis.normalised_error(df)
+        ModelAnalysis.generalised_scatter_plots_by_feature(
+            df, 'actuals', 'normalised_error', (price_r, error_r), outputs_dir,
+            'normalised_error', True
         )
 
-        for column, t, qq in plots:
+    def normalised_error(df):
+        return (df['cv_error'] / df['actuals']).abs()
+
+    def model_accuracy_by_feature(df, price_r, outputs_dir):
+        ModelAnalysis.generalised_scatter_plots_by_feature(
+            df, 'actuals', 'cv_estimates', (price_r, price_r), outputs_dir,
+            'model_accuracy', False
+        )
+
+    def generalised_scatter_plots_by_feature(
+        df, value_1, value_2, scatter_lims, outputs_dir, img_name, normalised
+    ):
+        for feature_name, t, qq in ModelAnalysis.ACCURACY_BY_FEATURE_PLOTS:
             if t == 'num':
                 ModelAnalysis.scatter_plot_numerical_column(
-                    df, column, qq, scatter_lims, outputs_dir)
+                    df[feature_name], feature_name, df[value_1], df[value_2],
+                    qq, scatter_lims, normalised, outputs_dir,
+                    '%s_-_%s_%i_to_%i+.png' % (img_name, feature_name, qq[0], qq[1])
+                )
             elif t == 'cat':
                 ModelAnalysis.scatter_plot_categorical_column(
-                    df, column, qq, scatter_lims, outputs_dir)
+                    df[feature_name], feature_name, df[value_1], df[value_2],
+                    qq, scatter_lims, normalised, outputs_dir,
+                    '%s_-_%s_for_%s.png' % (img_name, feature_name, qq)
+                )
 
-    def scatter_plot_numerical_column(df, column, qq, scatter_lims, outputs_dir):
+    def scatter_plot_numerical_column(
+        feature, feature_name, x1, x2,
+        qq, scatter_lims, normalised, outputs_dir, img_name
+    ):
         x_min, x_max = qq
         x_len = x_max - x_min + 1
 
-        img_name = 'model_accuracy_-_%s_%i_to_%i+.png' % (column, x_min, x_max)
         axes_spec = [
             (i, '>=' if i == x_max else '==', i-1)
             for i in range(x_min, x_len + 1)
         ]
         ModelAnalysis.scatter_plt_series(
-            df, column, axes_spec, x_len, scatter_lims, outputs_dir, img_name)
+            feature, feature_name, x1, x2,
+            axes_spec, x_len, scatter_lims, normalised, outputs_dir, img_name
+        )
 
-    def scatter_plot_categorical_column(df, column, qq, scatter_lims, outputs_dir):
+    def scatter_plot_categorical_column(
+        feature, feature_name, x1, x2,
+        qq, scatter_lims, normalised, outputs_dir, img_name
+    ):
         if qq == 'all':
-            cats = df[column].unique()
+            cats = feature.unique()
         else:
             raise RuntimeError('A qq of %s is not supported.' % qq)
         x_len = len(cats)
 
-        img_name = 'model_accuracy_-_%s_for_%s.png' % (column, qq)
         axes_spec = [(cats[i], '==', i)for i in range(x_len)]
         ModelAnalysis.scatter_plt_series(
-            df, column, axes_spec, x_len, scatter_lims, outputs_dir, img_name)
+            feature, feature_name, x1, x2,
+            axes_spec, x_len, scatter_lims, normalised, outputs_dir, img_name
+        )
 
     def scatter_plt_series(
-        df, column, axes_spec, x_len, scatter_lims, outputs_dir, img_name
+        feature, feature_name, x1, x2,
+        axes_spec, x_len, scatter_lims, normalised, outputs_dir, img_name
     ):
         f, axes = plt.subplots(1, x_len, figsize=(10*x_len, 10))
         axes[0].set_ylabel('price')
         for value, op, axis_i in axes_spec:
-            if op == '=>':
-                x = df[df[column] >= value]
+            if op == '>=':
+                filter_ = feature >= value
             elif op == '==':
-                x = df[df[column] == value]
-            axes[axis_i].set_xlabel('%s == %s' % (column, str(value)))
-            ModelAnalysis.scatter_plt_x_on_axis(axes[axis_i], x, scatter_lims)
+                filter_ = feature == value
+            else:
+                raise ValueError('Operation "%s" not understood.' % op)
+
+            axes[axis_i].set_xlabel('%s == %s' % (feature_name, str(value)))
+            ModelAnalysis.scatter_plt_on_axis(
+                axes[axis_i], x1[filter_], x2[filter_], scatter_lims, normalised
+            )
+
         plt.savefig(os.path.join(outputs_dir, img_name))
 
-    def scatter_plt_x_on_axis(axis, x, scatter_lims):
-        axis.scatter(x['actuals'], x['cv_estimates'])
-        max_point = x[['actuals', 'cv_estimates']].max().max()
-        axis.plot([0, max_point], [0, max_point])
-        axis.set_xlim(scatter_lims)
-        axis.set_ylim(scatter_lims)
+    def scatter_plt_actuals_v_estimates(axis, df, scatter_lims):
+        ModelAnalysis.scatter_plt_on_axis(
+            axis,
+            x['actuals'] ,x['cv_estimates'],
+            scatter_lims
+        )
+
+    def scatter_plt_on_axis(axis, x, y, scatter_lims, normalised):
+        axis.scatter(x, y)
+        max_value = max((x.max(), y.max()))
+        if normalised:
+            pass
+        else:
+            axis.plot([0, max_value], [0, max_value])
+        axis.set_xlim(scatter_lims[0])
+        axis.set_ylim(scatter_lims[1])
