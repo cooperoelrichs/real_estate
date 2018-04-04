@@ -90,6 +90,7 @@ class ModelAnalysis():
         for x in results:
             print(x)
 
+        plt.clf()
         f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
         ModelAnalysis.scatter_plt_actuals_v_estimates(ax1, results, scatter_lims)
         plt.savefig(output_file)
@@ -279,10 +280,12 @@ class ModelAnalysis():
 
         x = xy.X[cols].copy()
         x['price'] = xy.y
+        plt.clf()
         scatter_matrix(x, alpha=0.2, figsize=(20, 20), diagonal='kde')
         plt.savefig(output_file)
 
     def model_accuracy(results, scatter_lims, error_density_lims, output_file):
+        plt.clf()
         f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
         ax1.set_ylabel('price')
         ax1.set_xlabel('model accuracy scatter plot')
@@ -299,9 +302,10 @@ class ModelAnalysis():
         df, price_range, error_range, outputs_dir
     ):
         for img_name, y in (
-            ('norm_errors_by_time.png', ModelAnalysis.normalised_error(df)),
-            ('abs_errors_by_time.png', df['cv_error'])
+            ('normalised_errors_by_time.png', ModelAnalysis.normalised_error(df)),
+            ('errors_by_time.png', df['cv_error'])
         ):
+            plt.clf()
             f, axis = plt.subplots(1, 1, figsize=(20, 10))
             axis.set_ylabel('price')
             axis.set_xlabel('model accuracy scatter plot')
@@ -310,6 +314,33 @@ class ModelAnalysis():
             # axis.set_ylim(error_range)
 
             plt.savefig(os.path.join(outputs_dir, img_name))
+
+    def plot_average_daily_errors(df, outputs_dir, kind):
+        ModelAnalysis.plot_averaged_values_by_group(
+            df['cv_error'].abs(),
+            [df['date'].dt.year, df['date'].dt.month, df['date'].dt.day],
+            outputs_dir, 'average_daily_abs_errors_-_%s.png' % kind, kind
+        )
+
+    def plot_average_weekly_errors(df, outputs_dir, kind):
+        ModelAnalysis.plot_averaged_values_by_group(
+            df['cv_error'].abs(),
+            [df['date'].dt.year, df['date'].dt.month, df['date'].dt.week],
+            outputs_dir, 'average_weekly_abs_errors_-_%s.png' % kind, kind
+        )
+
+    def plot_average_monthly_errors(df, outputs_dir, kind):
+        ModelAnalysis.plot_averaged_values_by_group(
+            df['cv_error'].abs(),
+            [df['date'].dt.year, df['date'].dt.month],
+            outputs_dir, 'average_monthly_abs_errors_-_%s.png' % kind, kind
+        )
+
+    def plot_averaged_values_by_group(values, group_by, outputs_dir, img_name, kind):
+        plt.clf()
+        values.groupby(group_by).mean().plot(kind=kind)
+        plt.tight_layout()
+        plt.savefig(os.path.join(outputs_dir, img_name))
 
     ACCURACY_BY_FEATURE_PLOTS = (
         ('bedrooms', 'num', (1, 8)),
@@ -388,6 +419,7 @@ class ModelAnalysis():
         feature, feature_name, x1, x2,
         axes_spec, x_len, scatter_lims, normalised, outputs_dir, img_name
     ):
+        plt.clf()
         f, axes = plt.subplots(1, x_len, figsize=(10*x_len, 10))
         axes[0].set_ylabel('price')
         for value, op, axis_i in axes_spec:
