@@ -33,6 +33,7 @@ class XY(object):
 
         (('X',), 'continuous'),  # longitude
         (('Y',), 'continuous'),  # latitude
+        (('last_encounted',), 'time_sequence'),
     ]
 
     ORDINAL_EXCLUDE = 1
@@ -49,6 +50,7 @@ class XY(object):
 
     MINIMUM_SUBURB_POPULATION = 20  # 100
     # VALID_SUBURBS_LIST = None  # Make this
+    EPOCH = np.datetime64('2017-11-09')
 
     def setup_self(
         self, df, x_spec, exclude_suburb, perform_merges,
@@ -183,6 +185,8 @@ class XY(object):
             df = self.prep_polynomial(polynomial[0], df)
         for numerical in [a for a, b in x_spec if b == 'numerically_encoded']:
             df = self.prep_numerically_encoded(numerical[0], df)
+        for time_sequence in [a for a, b in x_spec if b == 'time_sequence']:
+            df = self.prep_time_sequence(time_sequence[0], df)
 
         set_of_linear_by_categorical = [
             a for a, b in x_spec if b == 'linear_by_categorical'
@@ -191,6 +195,14 @@ class XY(object):
         for linear_by_categorical in set_of_linear_by_categorical:
             df = self.prep_linear_by_categorical(linear_by_categorical, df)
         return df
+
+    def prep_time_sequence(self, feature, X):
+        time_delta = pd.Series(
+            data=(X[feature].values - self.EPOCH),
+            index=X.index
+        )
+        X['last_encounted'] = time_delta.dt.days
+        return X
 
     def prep_numerically_encoded(self, feature, X):
         X.loc[:, feature] = [str(a) for a in X[feature].values]
