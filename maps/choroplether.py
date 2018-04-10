@@ -13,7 +13,7 @@ from shapely.geometry import shape
 from shapely.ops import transform
 from descartes import PolygonPatch
 # from pysal.esda.mapclassify import (Natural_Breaks, User_Defined)
-from user_defined_with_minimum import User_Defined_With_Minimum
+# from user_defined_with_minimum import User_Defined_With_Minimum
 
 
 class Choroplether():
