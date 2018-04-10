@@ -61,7 +61,7 @@ class PriceModel(object):
         self.model.fit(self.X[train_i], self.y[train_i])
         score = self.model.score(self.X[test_i], self.y[test_i])
 
-        if score < -10 ** 6:
+        if np.isnan(score) or score < -10 ** 6:
             raise RuntimeError(
                 'Encounted a bad score, model likely unidentifiable'
             )
