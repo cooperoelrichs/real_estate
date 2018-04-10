@@ -13,48 +13,48 @@ class SimpleNeuralNetworkModel(object):
     LAMBDA_L2 = 0.05
     DROPOUT_FRACTION = 0.4
 
-    def __init__(self, input_dim, nb_epoch, batch_size):
+    def __init__(self, input_dim, epochs, batch_size):
         self.input_dim = input_dim
-        self.nb_epoch = nb_epoch
+        self.epochs = epochs
         self.batch_size = batch_size
 
     def compile_model(self):
         model = Sequential()
         model.add(Dense(
-            input_dim=self.input_dim, output_dim=512,
-            init='normal',
+            input_dim=self.input_dim, units=512,
+            kernel_initializer='normal',
             activation='relu',
-            W_regularizer=l2(self.LAMBDA_L2)
+            kernel_regularizer=l2(self.LAMBDA_L2)
         ))
         model.add(Dropout(self.DROPOUT_FRACTION))
         model.add(Dense(
-            input_dim=self.input_dim, output_dim=512,
-            init='normal',
+            input_dim=self.input_dim, units=512,
+            kernel_initializer='normal',
             activation='relu',
-            W_regularizer=l2(self.LAMBDA_L2)
+            kernel_regularizer=l2(self.LAMBDA_L2)
         ))
         model.add(Dropout(self.DROPOUT_FRACTION))
         model.add(Dense(
-            input_dim=self.input_dim, output_dim=256,
-            init='normal',
+            input_dim=self.input_dim, units=256,
+            kernel_initializer='normal',
             activation='relu',
-            W_regularizer=l2(self.LAMBDA_L2)
+            kernel_regularizer=l2(self.LAMBDA_L2)
         ))
         model.add(Dropout(self.DROPOUT_FRACTION))
         model.add(Dense(
-            input_dim=self.input_dim, output_dim=16,
-            init='normal',
+            input_dim=self.input_dim, units=16,
+            kernel_initializer='normal',
             activation='relu',
-            W_regularizer=l2(self.LAMBDA_L2)
+            kernel_regularizer=l2(self.LAMBDA_L2)
         ))
         model.add(Dropout(self.DROPOUT_FRACTION))
         model.add(Dense(
-            output_dim=1,
-            init='normal'
+            units=1,
+            kernel_initializer='normal'
         ))
 
         adam = Adam(
-            lr=0.002  # 0.001,
+            lr=0.001  # 0.001,
             # beta_1=0.9,
             # beta_2=0.999,
             # epsilon=None,
@@ -76,10 +76,10 @@ class SimpleNeuralNetworkModel(object):
         self.model = self.compile_model()
         self.model.fit(
             X_scaled, y_train,
-            nb_epoch=self.nb_epoch,
+            epochs=self.epochs,
             batch_size=self.batch_size,
-            verbose=2
-            # validation_split=0.33
+            verbose=2,
+            validation_split=0.3
         )
 
     def predict(self, X_pred):
@@ -111,7 +111,7 @@ class NN(PriceModel):
 
     PARAMS = {
         # 'input_dim': 10,
-        'nb_epoch': 100,
+        'epochs': 200,
         'batch_size': 1024,
     }
 
