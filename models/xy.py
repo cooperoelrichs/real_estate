@@ -33,7 +33,7 @@ class XY(object):
 
         (('X',), 'continuous'),  # longitude
         (('Y',), 'continuous'),  # latitude
-        (('last_encounted',), 'time_sequence'),
+        # (('last_encounted',), 'time_sequence'),
     ]
 
     ORDINAL_EXCLUDE = 1
