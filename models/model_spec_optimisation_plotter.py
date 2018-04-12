@@ -1,4 +1,5 @@
 import os
+from numbers import Number
 
 import pandas as pd
 import numpy as np
@@ -32,7 +33,13 @@ class ModelSpecOptimisationPlotter():
         for i, sp in enumerate(plot):
             legend = []
             for l in sp.lines:
-                axes[i].plot(l.values, l.results, '-o')
+                if not isinstance(l.values[0], Number):
+                    indicies = list(range(len(l.values)))
+                    axes[i].plot(indicies, l.results, '-o')
+                    axes[i].set_xticks(indicies)
+                    axes[i].set_xticklabels(list(map(str, l.values)))
+                else:
+                    axes[i].plot(l.values, l.results, '-o')
                 legend.append(
                     ModelSpecOptimisationPlotter.legend_name(l.names, l.spec)
                 )
@@ -41,7 +48,9 @@ class ModelSpecOptimisationPlotter():
         plt.savefig(output_file, dpi=500)
 
     def legend_name(names, values):
-        return ', '.join(map(ModelSpecOptimisationPlotter.strify, zip(names, values)))
+        return ', '.join(
+            map(ModelSpecOptimisationPlotter.strify, zip(names, values))
+        )
 
     def strify(x):
         n, v = x
@@ -49,6 +58,8 @@ class ModelSpecOptimisationPlotter():
             return '%s %.3f' % (n, v)
         elif isinstance(v, int):
             return '%s %i' % (n, v)
+        elif isinstance(v, tuple):
+            return '%s %s' % (n, str(v))
         else:
             raise RuntimeError('What is this: %s, %s' % (str(v), str(type(v))))
 
