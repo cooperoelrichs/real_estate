@@ -13,12 +13,13 @@ from real_estate.models.price_model import PriceModel
 class EmptyKerasModel(object):
     def __init__(
         self, input_dim, epochs, batch_size,
-        learning_rate, verbosity
+        learning_rate, validation_split, verbosity
     ):
         self.input_dim = input_dim
         self.epochs = epochs
         self.batch_size = batch_size
         self.learning_rate = learning_rate
+        self.validation_split = validation_split
         self.verbosity = verbosity
 
     def compile_model(self):
@@ -35,7 +36,7 @@ class EmptyKerasModel(object):
             epochs=self.epochs,
             batch_size=self.batch_size,
             verbose=self.verbosity,
-            # validation_split=0.3
+            validation_split=self.validation_split
         )
 
     def predict(self, X_pred):
@@ -66,7 +67,6 @@ class LinearNN(EmptyKerasModel):
         model.add(Dense(
             input_dim=self.input_dim, units=1,
             kernel_initializer='normal',
-            # kernel_regularizer=l2(self.LAMBDA_L2)
         ))
 
         gd = TFOptimizer(tf.train.GradientDescentOptimizer(
@@ -83,55 +83,36 @@ class LinearNN(EmptyKerasModel):
 
 class SimpleNeuralNetworkModel(EmptyKerasModel):
     def __init__(
-        self, input_dim, epochs, batch_size,
+        self, input_dim, layers, epochs, batch_size,
         learning_rate, lambda_l2, dropout_fraction,
-        verbosity
+        validation_split, verbosity
     ):
         super().__init__(
-            input_dim, epochs, batch_size, learning_rate, verbosity
+            input_dim, epochs, batch_size, learning_rate, validation_split,
+            verbosity
         )
+        self.layers = layers
         self.lambda_l2 = lambda_l2
         self.dropout_fraction = dropout_fraction
 
     def compile_model(self):
-        model_width = 32
         model = Sequential()
-        model.add(Dense(
-            input_dim=self.input_dim, units=32,
-            kernel_initializer='normal',
-            activation='relu',
-            kernel_regularizer=l2(self.lambda_l2)
-        ))
-        model.add(Dense(
-            input_dim=self.input_dim, units=model_width,
-            kernel_initializer='normal',
-            activation='relu',
-            kernel_regularizer=l2(self.lambda_l2)
-        ))
-        model.add(Dense(
-            input_dim=self.input_dim, units=model_width,
-            kernel_initializer='normal',
-            activation='relu',
-            kernel_regularizer=l2(self.lambda_l2)
-        ))
-        model.add(Dense(
-            input_dim=self.input_dim, units=model_width,
-            kernel_initializer='normal',
-            activation='relu',
-            kernel_regularizer=l2(self.lambda_l2)
-        ))
-        model.add(Dense(
-            input_dim=self.input_dim, units=model_width,
-            kernel_initializer='normal',
-            activation='relu',
-            kernel_regularizer=l2(self.lambda_l2)
-        ))
-        model.add(Dense(
-            input_dim=self.input_dim, units=16,
-            kernel_initializer='normal',
-            activation='relu',
-            kernel_regularizer=l2(self.lambda_l2)
-        ))
+        for i, width in enumerate(self.layers):
+            if i == 0:
+                model.add(Dense(
+                    input_dim=self.input_dim, units=width,
+                    kernel_initializer='normal',
+                    activation='relu',
+                    kernel_regularizer=l2(self.lambda_l2)
+                ))
+            else:
+                model.add(Dense(
+                    units=width,
+                    kernel_initializer='normal',
+                    activation='relu',
+                    kernel_regularizer=l2(self.lambda_l2)
+                ))
+
         model.add(Dense(
             units=1,
             kernel_initializer='normal'
@@ -177,17 +158,33 @@ class NN(PriceModel):
     HAS_FEATURE_IMPORTANCE = False
     MODEL_CLASS = SimpleNeuralNetworkModel
 
+    # PARAMS = {
+    #     # Average cv score - simple_nn_model_test: 0.348
+    #     'layers': (32, 1024, 1024, 64, 64, 32),
+    #     'epochs': 400,
+    #     'batch_size': 1024,
+    #     'learning_rate': 0.0001,
+    #     'verbosity': 2,
+    #     'lambda_l2': 2e6,
+    #     'dropout_fraction': 0,
+    #     'validation_split': 0.3
+    # }
+
     PARAMS = {
-        'epochs': 200,
+        'layers': (32, 1024, 1024, 64, 64, 32),
+        'epochs': 400,
         'batch_size': 1024,
-        'learning_rate': 0.0002,
+        'learning_rate': 0.0001,
         'verbosity': 2,
-        'lambda_l2': 1e7,
+        'lambda_l2': 2e6,
         'dropout_fraction': 0,
+        'validation_split': 0.3
     }
 
     def __init__(self, X, y, X_labels, params=None):
         if params is None:
             params = self.PARAMS
+            params['input_dim'] = X.shape[1]
+        else:
             params['input_dim'] = X.shape[1]
         super().__init__(X, y, X_labels, params)
