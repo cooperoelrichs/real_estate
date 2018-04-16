@@ -84,7 +84,7 @@ class LinearNN(EmptyKerasModel):
 class SimpleNeuralNetworkModel(EmptyKerasModel):
     def __init__(
         self, input_dim, layers, epochs, batch_size,
-        learning_rate, lambda_l2, dropout_fraction,
+        learning_rate, lambda_l1, lambda_l2, dropout_fraction,
         validation_split, verbosity
     ):
         super().__init__(
@@ -92,8 +92,14 @@ class SimpleNeuralNetworkModel(EmptyKerasModel):
             verbosity
         )
         self.layers = layers
+        self.lambda_l1 = lambda_l1
         self.lambda_l2 = lambda_l2
         self.dropout_fraction = dropout_fraction
+
+        if self.lambda_l2 is not None:
+            raise ValueError(
+                'L2 regulisation is temporaly disabled, see commented code below.'
+            )
 
     def compile_model(self):
         model = Sequential()
@@ -103,14 +109,16 @@ class SimpleNeuralNetworkModel(EmptyKerasModel):
                     input_dim=self.input_dim, units=width,
                     kernel_initializer='normal',
                     activation='relu',
-                    kernel_regularizer=l2(self.lambda_l2)
+                    kernel_regularizer=l1(self.lambda_l1)
+                    # kernel_regularizer=l2(self.lambda_l2)
                 ))
             else:
                 model.add(Dense(
                     units=width,
                     kernel_initializer='normal',
                     activation='relu',
-                    kernel_regularizer=l2(self.lambda_l2)
+                    kernel_regularizer=l1(self.lambda_l1)
+                    # kernel_regularizer=l2(self.lambda_l2)
                 ))
 
         model.add(Dense(
@@ -158,25 +166,29 @@ class NN(PriceModel):
     HAS_FEATURE_IMPORTANCE = False
     MODEL_CLASS = SimpleNeuralNetworkModel
 
+    # Try with model with a significantly smaller learning rate (0.00001?)
     # PARAMS = {
-    #     # Average cv score - simple_nn_model_test: 0.348
-    #     'layers': (32, 1024, 1024, 64, 64, 32),
-    #     'epochs': 400,
+    #     'layers': (2048, 1024, 512, 256, 256) + (256,) * 15,
+    #     'epochs': 600,
     #     'batch_size': 1024,
     #     'learning_rate': 0.0001,
     #     'verbosity': 2,
-    #     'lambda_l2': 2e6,
+    #     'lambda_l1': 100,
+    #     'lambda_l2': None,
     #     'dropout_fraction': 0,
     #     'validation_split': 0.3
     # }
 
     PARAMS = {
-        'layers': (32, 1024, 1024, 64, 64, 32),
-        'epochs': 400,
+        # 'layers': (2048, 512, 512, 512, 256),  # Epoch 73, r2: 0.5092, val_r2: 0.3379
+        # 'layers': (128 ,)*10,  # Epoch 116, r2: 0.5109, val_r2: 0.3914
+        'layers': (1024, 1024, 256, 256, 256),
+        'epochs': 600,
         'batch_size': 1024,
         'learning_rate': 0.0001,
         'verbosity': 2,
-        'lambda_l2': 2e6,
+        'lambda_l1': 100,
+        'lambda_l2': None,
         'dropout_fraction': 0,
         'validation_split': 0.3
     }
