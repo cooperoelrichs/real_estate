@@ -20,15 +20,7 @@ class LocallyConnectedNeuralNetworkModel(SimpleNeuralNetworkModel):
     KERNEL_INITIALIZER = 'normal'
 
     def compile_model(self):
-        model = Sequential()
-        for i, layer in enumerate(self.layers):
-            layer_type, layer_params = layer
-            model = self.add_layer_of_type(model, i, layer_type, layer_params)
-
-        model.add(Dense(
-            units=1,
-            kernel_initializer='normal'
-        ))
+        model = self.build_model()
 
         adam = Adam(
             lr=self.learning_rate  # 0.001,
@@ -43,6 +35,19 @@ class LocallyConnectedNeuralNetworkModel(SimpleNeuralNetworkModel):
             optimizer=adam,
             metrics=[SimpleNeuralNetworkModel.r2]
         )
+        return model
+
+    def build_model(self):
+        model = Sequential()
+        for i, layer in enumerate(self.layers):
+            layer_type, layer_params = layer
+            model = self.add_layer_of_type(model, i, layer_type, layer_params)
+
+        model.add(Dense(
+            units=1,
+            kernel_initializer='normal'
+        ))
+
         return model
 
     def add_layer_of_type(self, model, i, layer_type, layer_params):
@@ -91,26 +96,27 @@ class LCNN(NN):
     MODEL_CLASS = LocallyConnectedNeuralNetworkModel
     PARAMS = {
         'layers': [
-            # ('dense', (256,)),
-            # ('reshape', ((256, 1), (256,))),
-            # ('locally_connected', (3, 10, 1)),
-            # ('dense', (256,)),
-            # ('flatten', None),
-            # ('reshape', ((256, 1), (256,))),
-            # ('locally_connected', (3, 10, 1)),
-            # ('dense', (256,)),
-            # ('flatten', None),
+            ('dense', (512,)),
+            ('reshape', ((512, 1), (512,))),
+            ('locally_connected', (4, 20, 1)),
+            ('flatten', None),
 
-            ('dense', (5,)),
-            ('reshape', ((5, 1), (5,))),
-            ('locally_connected', (2, 5, 1)),
+            ('dense', (256,)),
+            ('reshape', ((256, 1), (256,))),
+            ('locally_connected', (3, 20, 1)),
             ('flatten', None),
-            ('dense', (5,)),
-            ('flatten', None),
+
+            ('dense', (256,)),
+
+            # ('dense', (10,)),
+            # ('reshape', ((10, 1), (10,))),
+            # ('locally_connected', (2, 3, 1)),
+            # ('flatten', None),
+            # ('dense', (5,)),
         ],
-        'epochs': 2,  # 100,
+        'epochs': 200,
         'batch_size': 1024,
-        'learning_rate': 0.0001,
+        'learning_rate': 0.0005,
         'verbosity': 2,
         'lambda_l2': 1e6,
         'dropout_fraction': 0,
