@@ -45,6 +45,34 @@ class ModelAnalysis():
             only_valid_geocoding=only_valid_geocoding
         )
 
+    def write_xy(xy, dir, file_name):
+        for df, a in ((xy.X, 'X'), (xy.y, 'y')):
+            extended_file_name = ModelAnalysis.xy_f_name(file_name, a, 'csv')
+            file_path = os.path.join(dir, extended_file_name)
+            print('Writing XY data set to: %s' % extended_file_name)
+            df.to_csv(file_path)
+
+    def read_xy(xy_class, dir, file_name, date_columns=[]):
+        X = pd.read_csv(
+            os.path.join(dir, ModelAnalysis.xy_f_name(file_name, 'X', 'csv')),
+            index_col=0,
+        )
+
+        y = pd.read_csv(
+            os.path.join(dir, ModelAnalysis.xy_f_name(file_name, 'y', 'csv')),
+            index_col=0, header=None,
+            dtype=np.float64
+        )
+
+        for name in date_columns:
+            X[name] = pd.to_datetime(
+                X[name], format='%Y-%m-%d %H:%M:%S'
+            )
+        return xy_class(X, y)
+
+    def xy_f_name(base, a, file_type):
+        return base + '_%s.%s' % (a, file_type)
+
     def test_a_set_of_model_params(
         data_file_path, file_type, xy_class, model_class,
         base_params, mod_names, mod_values, outputs_dir, only_valid_geocoding,

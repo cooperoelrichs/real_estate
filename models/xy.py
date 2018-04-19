@@ -12,28 +12,29 @@ class XY(object):
         (('garage_spaces',), 'polynomial'),
         (('bathrooms',), 'polynomial'),
 
+        (('X',), 'continuous'),  # longitude
+        (('Y',), 'continuous'),  # latitude
+        # (('last_encounted',), 'time_sequence'),
+
+
         # (('bedrooms',), 'categorical'),
         # (('bathrooms',), 'categorical'),
         # (('garage_spaces',), 'categorical'),
 
-        # (('bedrooms', 'property_type'), 'linear_by_categorical'),
-        # (('bathrooms', 'property_type'), 'linear_by_categorical'),
-        # (('garage_spaces', 'property_type'), 'linear_by_categorical'),
+        (('bedrooms', 'property_type'), 'linear_by_categorical'),
+        (('bathrooms', 'property_type'), 'linear_by_categorical'),
+        (('garage_spaces', 'property_type'), 'linear_by_categorical'),
 
         # (('bathrooms', 'suburb'), 'linear_by_categorical'),
         # (('bedrooms', 'suburb'), 'linear_by_categorical'),
         # (('garage_spaces', 'suburb'), 'linear_by_categorical'),
 
-        # (('property_type',), 'categorical'),
-        # (('suburb',), 'categorical')
+        (('property_type',), 'categorical'),
+        # (('suburb',), 'categorical'),
 
-        (('property_type',), 'numerically_encoded'),
+        # (('property_type',), 'numerically_encoded'),
         # (('suburb',), 'numerically_encoded'),
         # (('road',), 'numerically_encoded'),
-
-        (('X',), 'continuous'),  # longitude
-        (('Y',), 'continuous'),  # latitude
-        # (('last_encounted',), 'time_sequence'),
     ]
 
     ORDINAL_EXCLUDE = 1
@@ -327,6 +328,12 @@ class XY(object):
 
     def reduce_tuples(list_of_tuples):
         return list(sum(list_of_tuples, ()))
+
+
+class EmptyXY(XY):
+    def __init__(self, X, y):
+        self.X = X
+        self.y = y
 
 
 class SalesXY(XY):
