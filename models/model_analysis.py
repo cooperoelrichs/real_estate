@@ -26,10 +26,10 @@ class ModelAnalysis():
         data_file_path, file_type,
         xy_class, model_class,
         scatter_lims, error_density_lims,
-        outputs_dir, only_valid_geocoding
+        outputs_dir
     ):
         data = DataStorer.read_ft(file_type, data_file_path)
-        xy = ModelAnalysis.make_xy(data, xy_class, only_valid_geocoding)
+        xy = ModelAnalysis.make_xy(data, xy_class)
 
         ModelAnalysis.model_analysis(
             data, xy,
@@ -37,13 +37,8 @@ class ModelAnalysis():
             outputs_dir
         )
 
-    def make_xy(data, xy_class, only_valid_geocoding):
-        return xy_class(
-            data, xy_class.GENERIC_X_SPEC,
-            exclude_suburb=False,
-            filter_on_suburb_population=True,
-            only_valid_geocoding=only_valid_geocoding
-        )
+    def make_xy(data, xy_class):
+        return xy_class(data, xy_class.GENERIC_X_SPEC)
 
     def write_xy(xy, dir, file_name):
         for df, a in ((xy.X, 'X'), (xy.y, 'y')):
@@ -64,6 +59,10 @@ class ModelAnalysis():
             dtype=np.float64
         )
 
+        # y is expected to be a series with shape (n,) rather than a DataFrame
+        # with shape (n, 1).
+        y = y[1]
+
         for name in date_columns:
             X[name] = pd.to_datetime(
                 X[name], format='%Y-%m-%d %H:%M:%S'
@@ -75,16 +74,13 @@ class ModelAnalysis():
 
     def test_a_set_of_model_params(
         data_file_path, file_type, xy_class, model_class,
-        base_params, mod_names, mod_values, outputs_dir, only_valid_geocoding,
+        base_params, mod_names, mod_values, outputs_dir,
         post_fix=None, log=False
     ):
         print('Testing %i combinations.\n' % len(mod_values))
 
         data = DataStorer.read_ft(file_type, data_file_path)
-        xy = ModelAnalysis.make_xy(data, xy_class, only_valid_geocoding)
-
-        print(xy.X.columns)
-        print(xy.X.shape)
+        xy = ModelAnalysis.make_xy(data, xy_class)
 
         if log:
             log_file = ModelAnalysis.prep_logging(outputs_dir, base_params, post_fix)
