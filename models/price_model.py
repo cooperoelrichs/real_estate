@@ -31,6 +31,7 @@ class PriceModel(object):
             n_folds = self.N_FOLDS
 
         scores = []
+        mean_absolute_errors = []
         estimates = np.zeros_like(self.y)
         test = np.ones_like(self.y, dtype=bool)
         if n_folds == 1:
@@ -42,22 +43,30 @@ class PriceModel(object):
         for i, indicies in enumerate(folds):
             train_i, test_i = indicies
             score = self.score(train_i, test_i)
-            print('    Fold %i: %f' % (i, score))
             scores += [score]
 
             estimates[test_i] = self.model.predict(self.X[test_i])
             test[test_i] = False
 
+            mae = np.mean(np.abs(self.y[test_i] - estimates[test_i]))
+            mean_absolute_errors += [mae]
+
+            print('    Fold %i: %.4f, %.0f' % (i, score, mae))
+
         scores = np.array(scores)
+        mean_absolute_errors = np.array(mean_absolute_errors)
 
         if (n_folds != 1) and test.any():
-            raise RuntimeError('Estimates check failed, %i failures' % np.sum(test))
+            raise RuntimeError(
+                'Estimates check failed, %i failures' % np.sum(test)
+            )
 
-        return scores, estimates
+        return scores, mean_absolute_errors, estimates
 
     def scores(self):
         scores = []
-        for i, indicies in enumerate(KFold(n=self.X.shape[0], n_folds=self.N_FOLDS)):
+        folds = KFold(n=self.X.shape[0], n_folds=self.N_FOLDS)
+        for i, indicies in enumerate(folds):
             train_i, test_i = indicies
             score = self.score(train_i, test_i)
             print('    Fold %i: %f' % (i, score))
