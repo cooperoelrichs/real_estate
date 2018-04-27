@@ -8,9 +8,13 @@ class XY(object):
     """Generate X and y tensors from the properties DataFrame."""
 
     GENERIC_X_SPEC = [
-        (('bedrooms',), 'polynomial'),
-        (('garage_spaces',), 'polynomial'),
-        (('bathrooms',), 'polynomial'),
+        (('bedrooms',), 'continuous'),
+        (('garage_spaces',), 'continuous'),
+        (('bathrooms',), 'continuous'),
+
+        # (('bedrooms',), 'polynomial'),
+        # (('garage_spaces',), 'polynomial'),
+        # (('bathrooms',), 'polynomial'),
 
         (('X',), 'continuous'),  # longitude
         (('Y',), 'continuous'),  # latitude
@@ -21,9 +25,9 @@ class XY(object):
         # (('bathrooms',), 'categorical'),
         # (('garage_spaces',), 'categorical'),
 
-        (('bedrooms', 'property_type'), 'linear_by_categorical'),
-        (('bathrooms', 'property_type'), 'linear_by_categorical'),
-        (('garage_spaces', 'property_type'), 'linear_by_categorical'),
+        # (('bedrooms', 'property_type'), 'linear_by_categorical'),
+        # (('bathrooms', 'property_type'), 'linear_by_categorical'),
+        # (('garage_spaces', 'property_type'), 'linear_by_categorical'),
 
         # (('bathrooms', 'suburb'), 'linear_by_categorical'),
         # (('bedrooms', 'suburb'), 'linear_by_categorical'),
@@ -37,35 +41,40 @@ class XY(object):
         # (('road',), 'numerically_encoded'),
     ]
 
+    SALES_PRICE_LIMITS = (2e4, 1e7)
+    RENTALS_PRICE_LIMITS = (2e1, 1e4)
+
     ORDINAL_EXCLUDE = 1
     ORDINAL_MAX = 8
     POLYNOMIAL_DEGREE = 3
 
     CATEGORICALS_EXCLUSIONS = {
         'property_type': 'Not Specified',
-        'suburb': 'not specified',  # 'city',
+        'suburb': 'not specified',
         'bedrooms': 0,
         'bathrooms': 0,
         'garage_spaces': 0,
     }
 
-    MINIMUM_SUBURB_POPULATION = 20  # 100
-    # VALID_SUBURBS_LIST = None  # Make this
+    EXCLUDE_INVALID_GEOCODINGS = True
+    MINIMUM_SUBURB_POPULATION = None
     EPOCH = np.datetime64('2017-11-09')
 
+    DO_NAN_REPLACEMENTS = True
+    NAN_REPLACEMENTS = ('bathrooms', 'bedrooms', 'garage_spaces')
+
     def setup_self(
-        self, df, x_spec, exclude_suburb, perform_merges,
-        filter_on_suburb_population, only_valid_geocoding
+        self, df, x_spec, perform_merges,
     ):
         self.x_spec = x_spec
-        self.exclude_suburb = exclude_suburb
         self.perform_merges = perform_merges
-        self.filter_on_suburb_population = filter_on_suburb_population
-        self.only_valid_geocoding = only_valid_geocoding
         df = self.filter_data(df)
 
         if self.perform_merges:
             df = Unduplicator.check_and_unduplicate(df)
+
+        if self.DO_NAN_REPLACEMENTS:
+            df = self.replace_nans(df)
 
         self.numerical_encoders = {}
 
@@ -79,26 +88,38 @@ class XY(object):
             self.categorical_groups, self.by_categorical_groups, self.ne_groups
         )
 
+    def replace_nans(self, df):
+        print('Performing nan replacment:')
+        for c in self.NAN_REPLACEMENTS:
+            print(' * %s - replacing %i nans' % (c, pd.isnull(df[c]).sum()))
+            df.loc[pd.isnull(df[c]), c] = -1
+        return df
+
     def report_data_shape(self, X, y, cats, by_cats, nes):
         n_cats = sum(x2-x1 for _, x1, x2 in cats)
         n_by_cats = sum(x2-x1 for _, _, x1, x2 in by_cats)
         print('Shape of X - %s' % str(X.shape))
         print('Shape of y - %s' % str(y.shape))
-        print('X has %i categoricals and' % n_cats)
-        print('X has %i by categoricals.' % n_by_cats)
+        print('X has %i categoricals,' % n_cats)
+        print('X has %i by categoricals, and' % n_by_cats)
         print('X has %i numerically encoded features.' % len(nes))
 
     def filter_data(self, df):
         df = self.invalid_data_filter(df)
         df = self.qc_data_filter(df)
 
-        if self.filter_on_suburb_population:
+        if self.EXCLUDE_INVALID_GEOCODINGS:
             df = df[df['geocoding_is_valid']]
-        if self.filter_on_suburb_population:
+        if self.MINIMUM_SUBURB_POPULATION is not None:
             df = df[XY.minimum_suburb_population_filter(
                 df, self.MINIMUM_SUBURB_POPULATION
             )]
         return df
+
+    def experimental_generaly_invalid_data_filter(self, df):
+        print('Warning, using the experimental invalid data filter.')
+        return (np.isfinite(df['price_min']) | np.isfinite(df['price_max']))
+
 
     def generaly_invalid_data_filter(self, df):
         return (
@@ -130,7 +151,7 @@ class XY(object):
         ]
 
     def general_qc_data_filter(self, df):
-        return (pd.Series(np.ones(df.shape[0], dtype=bool), index=df.index))
+        return pd.Series(np.ones(df.shape[0], dtype=bool), index=df.index)
 
     def report_on_data_qc(self, df, outputs_dir):
         price_filtered = df[~ self.price_qc_filter(df)]
@@ -172,10 +193,7 @@ class XY(object):
         return X
 
     def get_individualised_x_spec(self):
-        if self.exclude_suburb:
-            return self.x_spec - {('suburb', 'categorical')}
-        else:
-            return self.x_spec
+        return self.x_spec
 
     def prep_work(self, df, x_spec):
         for categorical in [a for a, b in x_spec if b == 'categorical']:
@@ -337,22 +355,12 @@ class EmptyXY(XY):
 
 
 class SalesXY(XY):
-    def __init__(
-        self, df, x_spec, exclude_suburb=False, perform_merges=True,
-        filter_on_suburb_population=True,
-        only_valid_geocoding=True
-    ):
-        self.setup_self(
-            df, x_spec, exclude_suburb, perform_merges,
-            filter_on_suburb_population, only_valid_geocoding
-        )
+    def __init__(self, df, x_spec, perform_merges=True):
+        self.setup_self(df, x_spec, perform_merges)
 
     def invalid_data_filter(self, df):
-        # Required data: sale_type, price, and suburb
-        df = df[
-            self.invalid_sale_data_filter(df) &
-            self.generaly_invalid_data_filter(df)
-        ]
+        df = df[self.invalid_sale_data_filter(df)]
+        df = df[self.experimental_generaly_invalid_data_filter(df)]
         return df
 
     def invalid_sale_data_filter(self, df):
@@ -363,29 +371,21 @@ class SalesXY(XY):
 
     def price_qc_filter(self, df):
         return (
-            (df['price_min'] > 2 * 10**4) &
-            (df['price_max'] > 2 * 10**4) &
-            (df['price_min'] < 10**7) &
-            (df['price_max'] < 10**7)
+            (df['price_min'] > self.SALES_PRICE_LIMITS[0]) &
+            (df['price_max'] > self.SALES_PRICE_LIMITS[0]) &
+            (df['price_min'] < self.SALES_PRICE_LIMITS[1]) &
+            (df['price_max'] < self.SALES_PRICE_LIMITS[1])
         )
 
 
 class RentalsXY(XY):
-    def __init__(
-        self, df, x_spec, exclude_suburb=False, perform_merges=True,
-        filter_on_suburb_population=True,
-        only_valid_geocoding=True
-    ):
-        self.setup_self(
-            df, x_spec, exclude_suburb, perform_merges,
-            filter_on_suburb_population, only_valid_geocoding
-        )
+    def __init__(self, df, x_spec, perform_merges=True):
+        self.setup_self(df, x_spec, perform_merges)
 
     def invalid_data_filter(self, df):
-        # Required data: sale_type, price, and suburb
         df = df[
             self.invalid_rental_data_filter(df) &
-            self.generaly_invalid_data_filter(df)
+            self.experimental_generaly_invalid_data_filter(df)
         ]
         return df
 
@@ -396,8 +396,8 @@ class RentalsXY(XY):
 
     def price_qc_filter(self, df):
         return (
-            (df['price_min'] > 2 * 10 ** 1) &
-            (df['price_max'] > 2 * 10 ** 1) &
-            (df['price_min'] < 5 * 10 ** 3) &
-            (df['price_max'] < 5 * 10 ** 3)
+            (df['price_min'] > self.RENTALS_PRICE_LIMITS[0]) &
+            (df['price_max'] > self.RENTALS_PRICE_LIMITS[0]) &
+            (df['price_min'] < self.RENTALS_PRICE_LIMITS[1]) &
+            (df['price_max'] < self.RENTALS_PRICE_LIMITS[1])
         )
