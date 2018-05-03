@@ -4,14 +4,11 @@ from sklearn.metrics import mean_absolute_error
 
 
 class PriceModel(object):
-    N_FOLDS = 3
-
     def __init__(self, X, y, X_labels, params):
         if params == None:
             self.model = self.MODEL_CLASS(**self.PARAMS)
         else:
             self.model = self.MODEL_CLASS(**params)
-
         self.setup_self(X, y, X_labels)
 
     def setup_self(self, X, y, X_labels):
@@ -26,7 +23,13 @@ class PriceModel(object):
     def mean_absolute_error(self, y_pred):
         return mean_absolute_error(y_true=self.y, y_pred=y_pred)
 
-    def cv_score_and_predict(self, n_folds=None):
+    def model_summary(self):
+        print('This model does not support printing a model summary.')
+
+    def show_live_results(self, outputs_folder, name):
+        print('This model does not support showing live results.')
+
+    def cv_score_and_predict(self, n_folds):
         if n_folds is None:
             n_folds = self.N_FOLDS
 
@@ -34,12 +37,8 @@ class PriceModel(object):
         mean_absolute_errors = []
         estimates = np.zeros_like(self.y)
         test = np.ones_like(self.y, dtype=bool)
-        if n_folds == 1:
-            # everything = np.ones(self.X.shape[0], dtype=bool)
-            folds = list(KFold(n=self.X.shape[0], n_folds=10))[:1]
-        else:
-            folds = KFold(n=self.X.shape[0], n_folds=n_folds)
 
+        folds = self.construct_folds(n_folds)
         for i, indicies in enumerate(folds):
             train_i, test_i = indicies
             score = self.score(train_i, test_i)
@@ -63,9 +62,9 @@ class PriceModel(object):
 
         return scores, mean_absolute_errors, estimates
 
-    def scores(self):
+    def scores(self, n_folds):
         scores = []
-        folds = KFold(n=self.X.shape[0], n_folds=self.N_FOLDS)
+        folds = self.construct_folds(n_folds)
         for i, indicies in enumerate(folds):
             train_i, test_i = indicies
             score = self.score(train_i, test_i)
@@ -74,6 +73,13 @@ class PriceModel(object):
 
         scores = np.array(scores)
         return scores
+
+    def construct_folds(self, n_folds):
+        if n_folds == 1:
+            folds = list(KFold(n=self.X.shape[0], n_folds=5))[:1]
+        else:
+            folds = KFold(n=self.X.shape[0], n_folds=n_folds)
+        return folds
 
     def score(self, train_i, test_i):
         self.model.fit(self.X[train_i], self.y[train_i])
