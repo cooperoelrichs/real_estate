@@ -54,7 +54,9 @@ class ModelSpecOptimisationPlotter():
 
     def strify(x):
         n, v = x
-        if isinstance(v, float):
+        if isinstance(v, str):
+            return '%s %s' % (n, v)
+        elif isinstance(v, float):
             return '%s %.3f' % (n, v)
         elif isinstance(v, int):
             return '%s %i' % (n, v)
