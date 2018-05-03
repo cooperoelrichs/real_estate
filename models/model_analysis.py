@@ -73,14 +73,11 @@ class ModelAnalysis():
         return base + '_%s.%s' % (a, file_type)
 
     def test_a_set_of_model_params(
-        data_file_path, file_type, xy_class, model_class,
-        base_params, mod_names, mod_values, outputs_dir,
+        xy, model_class,
+        base_params, mod_names, mod_values, outputs_dir, n_folds,
         post_fix=None, log=False
     ):
         print('Testing %i combinations.\n' % len(mod_values))
-
-        data = DataStorer.read_ft(file_type, data_file_path)
-        xy = ModelAnalysis.make_xy(data, xy_class)
 
         if log:
             log_file = ModelAnalysis.prep_logging(outputs_dir, base_params, post_fix)
@@ -88,10 +85,11 @@ class ModelAnalysis():
         results = []
         for i, value_set in enumerate(mod_values):
             mod = list(zip(mod_names, value_set))
+            mod_str = ', '.join(['-'.join((a, str(b))) for a, b in mod])
             params = ModelAnalysis.modify_params(base_params, mod)
             scores = ModelAnalysis.test_model_params(
-                xy, model_class, params, (i+1, len(mod_values)),
-                log=log, log_file=log_file
+                xy, model_class, params, (i+1, len(mod_values)), n_folds,
+                log, log_file, outputs_dir, mod_str
             )
             results.append((mod, scores))
 
@@ -140,15 +138,21 @@ class ModelAnalysis():
         return params_str + scores_str
 
     def test_model_params(
-        xy, model_class, params, indicies, log, log_file
+        xy, model_class, params, indicies, n_folds,
+        log, log_file,
+        outputs_dir, test_name
     ):
+        print('\nScoring combination %i of %i.' % indicies)
         model = model_class(
             xy.X.values, xy.y.values,
             xy.X.columns.values,
             params=params
         )
-        print('\nScoring combination %i of %i.' % indicies)
-        scores = model.scores()
+
+        model.model_summary()
+        model.show_live_results(outputs_dir, test_name)
+
+        scores = model.scores(n_folds)
         print('Average score: %.3f' % np.mean(scores))
         if log:
             ModelAnalysis.log_scores(log_file, scores, params, indicies)
