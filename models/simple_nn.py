@@ -1,6 +1,6 @@
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, BatchNormalization, PReLU
-from keras.optimizers import Adam, SGD, TFOptimizer
+from keras.optimizers import Adam, SGD, TFOptimizer, Nadam
 from keras.regularizers import l1, l2, l1_l2
 from keras.callbacks import LearningRateScheduler
 from keras.constraints import max_norm
@@ -10,6 +10,7 @@ import numpy as np
 
 from sklearn.preprocessing import StandardScaler
 from real_estate.models.price_model import PriceModel
+from real_estate.models.live_keras_plotter import LivePlotter
 
 
 class EmptyScaler(object):
@@ -39,9 +40,13 @@ class EmptyKerasModel(object):
         self.learning_rate = learning_rate
         self.learning_rate_decay = learning_rate_decay
         self.momentum = momentum
-        self.callbacks = callbacks
         self.validation_split = validation_split
         self.verbosity = verbosity
+
+        if callbacks is None:
+            self.callbacks = []
+        else:
+            self.callbacks = callbacks
 
     def compile_model(self):
         raise NotImplementedError('This class should not be used directly.')
@@ -104,6 +109,16 @@ class EmptyKerasModel(object):
         '''Keras backend mean squared error.'''
         return K.mean(K.square(y_true - y_pred))
 
+    def smooth_l1(y_true, y_pred):
+        huber_delta = 0.5
+        d = K.abs(y_true - y_pred)
+        l = tf.where(
+            d < huber_delta,
+            0.5 * d ** 2,
+            huber_delta * (d - 0.5 * huber_delta)
+        )
+        return  K.sum(l)
+
     def scaled_mae(y_scaler):
         mean = y_scaler.mean_
         scale = y_scaler.scale_
@@ -165,7 +180,7 @@ class SimpleNeuralNetworkModel(EmptyKerasModel):
         self, input_dim, layers, epochs, batch_size,
         learning_rate, learning_rate_decay, momentum,
         lambda_l1, lambda_l2, dropout_fractions, max_norm,
-        validation_split, callbacks, verbosity, activation,
+        validation_split, callbacks, loss, optimizer, verbosity, activation,
         batch_normalization, kernel_initializer
     ):
         super().__init__(
@@ -181,6 +196,8 @@ class SimpleNeuralNetworkModel(EmptyKerasModel):
         self.activation = activation
         self.batch_normalization = batch_normalization
         self.kernel_initializer = kernel_initializer
+        self.loss = loss
+        self.optimizer = optimizer
 
     def compile_model(self):
         if self.dropout_fractions is not None and (
@@ -201,7 +218,6 @@ class SimpleNeuralNetworkModel(EmptyKerasModel):
                 model.add(Dense(
                     input_dim=self.input_dim, units=width,
                     kernel_initializer=self.kernel_initializer,
-                    # activation=self.activation,
                     kernel_regularizer=l1_l2(self.lambda_l1, self.lambda_l2),
                     kernel_constraint=kernel_constraint
                 ))
@@ -209,7 +225,6 @@ class SimpleNeuralNetworkModel(EmptyKerasModel):
                 model.add(Dense(
                     units=width,
                     kernel_initializer=self.kernel_initializer,
-                    # activation=self.activation,
                     kernel_regularizer=l1_l2(self.lambda_l1, self.lambda_l2),
                     kernel_constraint=kernel_constraint
                 ))
@@ -227,28 +242,36 @@ class SimpleNeuralNetworkModel(EmptyKerasModel):
 
         model.add(Dense(
             units=1,
-            kernel_initializer='normal'
+            kernel_initializer='normal',
+            kernel_regularizer=l1_l2(self.lambda_l1, self.lambda_l2)
         ))
 
-        # optimizer = Adam(
-        #     lr=self.learning_rate,
-        #     decay=self.learning_rate_decay,
-        # )
-        optimizer = SGD(
-            lr=self.learning_rate,
-            momentum=self.momentum,
-            decay=self.learning_rate_decay,
-            nesterov=True
-        )
+        if self.optimizer == 'sgd':
+            optimizer = SGD(
+                lr=self.learning_rate,
+                momentum=self.momentum,
+                decay=self.learning_rate_decay,
+                nesterov=True
+            )
+        elif self.optimizer == 'adam':
+            optimizer = Adam(
+                lr=self.learning_rate,
+                decay=self.learning_rate_decay,
+            )
+        elif self.optimizer == 'nadam':
+            optimizer = Nadam()
+
+        if self.loss == 'l1':
+            loss = EmptyKerasModel.smooth_l1
+        elif self.loss == 'l2':
+            loss = 'mean_squared_error'
 
         model.compile(
-            loss='mean_squared_error',
+            loss=loss,
             optimizer=optimizer,
             metrics=[
                 EmptyKerasModel.r2,
                 EmptyKerasModel.mae,
-                # EmptyKerasModel.scaled_mae(y_scaler),
-                # EmptyKerasModel.scaled_mse(y_scaler),
             ]
         )
         return model
@@ -279,25 +302,24 @@ class NN(PriceModel):
     MODEL_CLASS = SimpleNeuralNetworkModel
 
     PARAMS = {
-        # lr 1e-5, lrd 100: 0.45
-        # lr 1e-4, lrd 1000: 0.32 (still fitting after 1000 epochs)
-        # lr 1e-4, lrd 100: 0.34
-        'layers': (2**8,) * 5,
+        'layers': (2**9,)*5,
         'epochs': 2000,
         'batch_size': 2**9,
-        'learning_rate': 1e-5,
-        'learning_rate_decay': 100,
-        'momentum': 0.95,
+        'learning_rate': 1000,
+        'learning_rate_decay': 0.1,
+        'momentum': None,
         'verbosity': 2,
-        'lambda_l1': 0,
-        'lambda_l2': 0.001,
+        'lambda_l1': 1,
+        'lambda_l2': 1,
         'max_norm': None,
-        'validation_split': 0.2,
-        'callbacks': [],
-        'dropout_fractions': (0.2,) + (0.5,) * 4,
+        'validation_split': 0.3,
+        'callbacks': None,
+        'dropout_fractions': (0,) + (0.5,)*4,
         'activation': 'prelu',
         'batch_normalization': True,
         'kernel_initializer': 'lecun_uniform',
+        'loss': 'l1',
+        'optimizer': 'nadam'
     }
 
     def __init__(self, X, y, X_labels, params=None):
@@ -307,3 +329,13 @@ class NN(PriceModel):
         else:
             params['input_dim'] = X.shape[1]
         super().__init__(X, y, X_labels, params)
+
+    def model_summary(self):
+        self.model.compile_model().summary()
+
+    def show_live_results(self, outputs_folder, name):
+        self.model.callbacks = [
+            a for a in self.model.callbacks
+        ] + [
+            LivePlotter((25, 10), self.model.epochs, outputs_folder, name)
+        ]
