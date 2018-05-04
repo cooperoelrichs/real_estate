@@ -1,11 +1,13 @@
-from keras.models import Sequential
-from keras.layers import Dense, Dropout, Activation, BatchNormalization, PReLU
-from keras.optimizers import Adam, SGD, TFOptimizer, Nadam
-from keras.regularizers import l1, l2, l1_l2
-from keras.callbacks import LearningRateScheduler
-from keras.constraints import max_norm
-from keras import backend as K
 import tensorflow as tf
+import tensorflow
+from tensorflow.python.keras.models import Sequential
+from tensorflow.python.keras.optimizers import Adam, SGD, Nadam
+from tensorflow.python.keras.regularizers import l1, l2, l1_l2
+from tensorflow.python.keras.callbacks import LearningRateScheduler
+from tensorflow.python.keras.constraints import max_norm
+from tensorflow.python.keras.layers import (
+    Dense, Dropout, Activation, BatchNormalization, PReLU)
+
 import numpy as np
 
 from sklearn.preprocessing import StandardScaler
@@ -94,30 +96,32 @@ class EmptyKerasModel(object):
 
     def r2(y_true, y_pred):
         '''Keras backend r2 score.'''
-        ss_res = K.sum(K.square(y_true - y_pred))
-        ss_tot = K.sum(K.square(y_true - K.mean(y_true)))
-        return 1 - ss_res/(ss_tot + K.epsilon())
+        ss_res = tf.keras.backend.sum(tf.keras.backend.square(y_true - y_pred))
+        ss_tot = tf.keras.backend.sum(
+            tf.keras.backend.square(y_true - tf.keras.backend.mean(y_true))
+        )
+        return 1 - ss_res/(ss_tot + tf.keras.backend.epsilon())
 
     def unscale(x, mean, scale):
         return (x * scale) + mean
 
     def mae(y_true, y_pred):
         '''Keras backend mean absolute error.'''
-        return K.mean(K.abs(y_true - y_pred))
+        return tf.keras.backend.mean(tf.keras.backend.abs(y_true - y_pred))
 
     def mse(y_true, y_pred):
         '''Keras backend mean squared error.'''
-        return K.mean(K.square(y_true - y_pred))
+        return tf.keras.backend.mean(tf.keras.backend.square(y_true - y_pred))
 
     def smooth_l1(y_true, y_pred):
         huber_delta = 0.5
-        d = K.abs(y_true - y_pred)
-        l = tf.where(
+        d = tf.keras.backend.abs(y_true - y_pred)
+        l = tf.keras.backend.where(
             d < huber_delta,
             0.5 * d ** 2,
             huber_delta * (d - 0.5 * huber_delta)
         )
-        return  K.sum(l)
+        return  tf.keras.backend.sum(l)
 
     def scaled_mae(y_scaler):
         mean = y_scaler.mean_
@@ -163,13 +167,16 @@ class LinearNN(EmptyKerasModel):
             kernel_initializer='normal',
         ))
 
-        gd = TFOptimizer(tf.train.GradientDescentOptimizer(
-            learning_rate=self.learning_rate
-        ))
+        sgd = SGD(
+            lr=self.learning_rate,
+            momentum=self.momentum,
+            decay=self.learning_rate_decay,
+            nesterov=True
+        )
 
         model.compile(
             loss='mean_squared_error',
-            optimizer=gd,
+            optimizer=sgd,
             metrics=[SimpleNeuralNetworkModel.r2]
         )
         return model
