@@ -62,6 +62,8 @@ class ModelSpecOptimisationPlotter():
             return '%s %i' % (n, v)
         elif isinstance(v, tuple):
             return '%s %s' % (n, str(v))
+        elif v is None:
+            return '%s %s' % (n, str(v))
         else:
             raise RuntimeError('What is this: %s, %s' % (str(v), str(type(v))))
 
