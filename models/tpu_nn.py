@@ -5,25 +5,20 @@ import numpy as np
 from sklearn.metrics import r2_score
 
 import tensorflow as tf
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+# os.environ['TF_CPP_MIN_VLOG_LEVEL'] = '3'
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-from tensorflow.python.keras.models import Sequential
-from tensorflow.python.keras.optimizers import Adam, SGD, Nadam
-from tensorflow.python.keras.regularizers import l1, l2, l1_l2
-from tensorflow.python.keras.callbacks import LearningRateScheduler
-from tensorflow.python.keras.constraints import max_norm
 from tensorflow.python.keras.layers import (
     Input, Dense, Dropout, Activation, BatchNormalization, PReLU
 )
 from tensorflow.python.estimator.inputs.queues import feeding_functions
-from tensorflow.python.util.tf_export import tf_export
-from tensorflow.python.ops.metrics_impl import mean as metrics_mean_fn
-from tensorflow.python.ops.metrics_impl import _remove_squeezable_dimensions
 
 from real_estate.models.simple_nn import NN, SimpleNeuralNetworkModel
 from real_estate.models.price_model import PriceModel
+from real_estate.models.tf_validation_hook import ValidationHook
 
-tf.logging.set_verbosity(tf.logging.FATAL)
+
+tf.logging.set_verbosity(tf.logging.DEBUG)
 
 
 class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
@@ -53,7 +48,7 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
     def compile_model(self):
         run_config = tf.contrib.tpu.RunConfig(
             # cluster=tpu_cluster_resolver,
-            # model_dir=self.outputs_dir,
+            model_dir=self.outputs_dir,
             session_config=tf.ConfigProto(
                 allow_soft_placement=True, log_device_placement=True
             ),
@@ -66,6 +61,7 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
             train_batch_size=self.batch_size,
             eval_batch_size=self.batch_size,
             # params={"data_dir": FLAGS.data_dir},
+            model_dir=self.outputs_dir,
             config=run_config
         )
         return estimator
@@ -104,11 +100,11 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         elif mode == tf.estimator.ModeKeys.EVAL:
             loss = TPUNeuralNetworkModel.loss_tensor(features, labels)
             metrics = (TPUNeuralNetworkModel.metrics_fn, (labels, model))
-            return tf.contrib.tpu.TPUEstimatorSpec(
+            return tf.estimator.EstimatorSpec(
                 mode=mode,
                 loss=loss,
                 predictions={'predictions': model},
-                eval_metrics=metrics
+                # eval_metrics=metrics
             )
         else:
             raise ValueError("Mode '%s' not supported." % mode)
@@ -144,24 +140,41 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         r2 = SimpleNeuralNetworkModel.r2(labels, predictions)
         return r2, None
 
-    def fit(self, X_train, y_train):
-        self.x_scaler, X_scaled = self.new_scaler(X_train)
+    def fit(self, X, y):
+        self.x_scaler, X_scaled = self.new_scaler(X)
         X_scaled = X_scaled.astype(np.float32)
-        y_train = y_train.astype(np.float32)
+        y = y.astype(np.float32)
+
+        validation_split = int(X.shape[0] * self.validation_split)
+        X_train = X_scaled[:validation_split]
+        X_valid = X_scaled[validation_split:]
+        y_train = y[:validation_split]
+        y_valid = y[validation_split:]
 
         self.model = self.compile_model()
-        input_fn = TPUNeuralNetworkModel.make_train_input_fn(
-            X_scaled, y_train, self.epochs
+        train_input_fn = TPUNeuralNetworkModel.make_train_input_fn(
+            X_train, y_train, self.epochs
+        )
+        validation_input_fn = TPUNeuralNetworkModel.make_train_input_fn(
+            X_valid, y_valid, self.epochs
         )
 
-        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-        tf.logging.set_verbosity(tf.logging.FATAL)
+        # validation_hook = ValidationHook(
+        #     TPUNeuralNetworkModel.model_fn,
+        #     {'batch_size':self.batch_size}, None,
+        #     validation_input_fn, self.outputs_dir,
+        #     every_n_steps=1000
+        # )
 
+        num_steps = int(
+            X_train.shape[0] * self.validation_split /
+            self.batch_size * self.epochs
+        )
         self.model.train(
-            input_fn=input_fn,
-            max_steps=int(X_train.shape[0] / self.batch_size * self.epochs)
+            input_fn=train_input_fn,
+            max_steps=100000,
+            # hooks=[validation_hook]
         )
-
         exit()
 
     def evaluate(self, X_test, y_test):
@@ -248,7 +261,6 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
 
             target = batch[-1]
             return features, target
-
         return input_fn
 
     def make_test_input_fn(
@@ -303,7 +315,7 @@ class TPUNN(NN):
     MODEL_CLASS = TPUNeuralNetworkModel
 
     def show_live_results(self, outputs_folder, name):
-        pass
+        self.model.outputs_dir = os.path.join(outputs_folder, 'checkpoints')
 
     def model_summary(self):
         PriceModel.model_summary(self)
