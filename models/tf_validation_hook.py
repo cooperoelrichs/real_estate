@@ -14,7 +14,8 @@ class ValidationHook(tf.train.SessionRunHook):
         #     model_dir=checkpoint_dir,
         #     # config=run_config
         # )
-        self._estimator = tf.estimator.Estimator(
+
+        self._eval_estimator = tf.estimator.Estimator(
             model_fn=model_fn,
             params=params,
             model_dir=checkpoint_dir
@@ -32,8 +33,10 @@ class ValidationHook(tf.train.SessionRunHook):
 
     def after_run(self, run_context, run_values):
         if self._should_trigger:
-            self._estimator.evaluate(
+            print('Running an evaluation epoch.')
+            self._eval_estimator.evaluate(
                 self._input_fn
             )
             self._timer.update_last_triggered_step(self._iter_count)
+            print('Evaluation complete.')
         self._iter_count += 1

@@ -1,19 +1,23 @@
 import os
 import sys
+import shutil
 
 import numpy as np
 from sklearn.metrics import r2_score
 
 import tensorflow as tf
-# os.environ['TF_CPP_MIN_VLOG_LEVEL'] = '3'
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_VLOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-from tensorflow.python.keras.layers import (
-    Input, Dense, Dropout, Activation, BatchNormalization, PReLU
-)
+# Input, Dense, Dropout, Activation, BatchNormalization, PReLU
+from tensorflow.python.layers.base import InputSpec as Input
+from tensorflow.python.layers.core import Dense
+
 from tensorflow.python.estimator.inputs.queues import feeding_functions
 
-from real_estate.models.simple_nn import NN, SimpleNeuralNetworkModel
+from real_estate.models.simple_nn import (
+    NN, SimpleNeuralNetworkModel, EmptyKerasModel
+)
 from real_estate.models.price_model import PriceModel
 from real_estate.models.tf_validation_hook import ValidationHook
 
@@ -24,26 +28,30 @@ tf.logging.set_verbosity(tf.logging.DEBUG)
 class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
     USE_TPU = False
 
-    # self.input_dim
-    # self.epochs
-    # self.batch_size
-    # self.validation_split
-    # self.verbosity
+    def __init__(
+        self, input_dim, epochs, batch_size, validation_split
+    ):
 
-    # TODO:
-    # self.learning_rate
-    # self.learning_rate_decay
-    # self.momentum
-    # self.layers
-    # self.lambda_l1
-    # self.lambda_l2
-    # self.dropout_fractions
-    # self.max_norm
-    # self.activation/
-    # self.batch_normalization
-    # self.kernel_initializer
-    # self.loss
-    # self.optimizer
+        self.input_dim = input_dim
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.validation_split = validation_split
+
+        # TODO:
+        # self.verbosity
+        # self.learning_rate
+        # self.learning_rate_decay
+        # self.momentum
+        # self.layers
+        # self.lambda_l1
+        # self.lambda_l2
+        # self.dropout_fractions
+        # self.max_norm
+        # self.activation/
+        # self.batch_normalization
+        # self.kernel_initializer
+        # self.loss
+        # self.optimizer
 
     def compile_model(self):
         run_config = tf.contrib.tpu.RunConfig(
@@ -99,19 +107,25 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
             )
         elif mode == tf.estimator.ModeKeys.EVAL:
             loss = TPUNeuralNetworkModel.loss_tensor(features, labels)
-            metrics = (TPUNeuralNetworkModel.metrics_fn, (labels, model))
+            mae = tf.metrics.mean_absolute_error(
+                labels=labels,
+                predictions=model
+            )
             return tf.estimator.EstimatorSpec(
                 mode=mode,
                 loss=loss,
                 predictions={'predictions': model},
-                # eval_metrics=metrics
+                eval_metric_ops={'mae': mae}
             )
         else:
             raise ValueError("Mode '%s' not supported." % mode)
 
     def model_tensor(features):
-        model = Input(tensor=features)
-        model = Dense(units=512, activation="relu")(model)
+        # model = Input(tensor=features)
+        print(type(features), features)
+        x = Dense(units=512, activation=tf.nn.relu)
+        print(type(x), x)
+        model = Dense(units=512, activation=tf.nn.relu)(features)
         model = Dense(units=1)(model)
         model = model[:, 0]
         return model
@@ -146,36 +160,44 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         y = y.astype(np.float32)
 
         validation_split = int(X.shape[0] * self.validation_split)
-        X_train = X_scaled[:validation_split]
-        X_valid = X_scaled[validation_split:]
-        y_train = y[:validation_split]
-        y_valid = y[validation_split:]
+        X_train = X_scaled[validation_split:]
+        X_valid = X_scaled[:validation_split]
+        y_train = y[validation_split:]
+        y_valid = y[:validation_split]
 
         self.model = self.compile_model()
         train_input_fn = TPUNeuralNetworkModel.make_train_input_fn(
             X_train, y_train, self.epochs
         )
-        validation_input_fn = TPUNeuralNetworkModel.make_train_input_fn(
-            X_valid, y_valid, self.epochs
-        )
-
-        # validation_hook = ValidationHook(
-        #     TPUNeuralNetworkModel.model_fn,
-        #     {'batch_size':self.batch_size}, None,
-        #     validation_input_fn, self.outputs_dir,
-        #     every_n_steps=1000
-        # )
+        hooks = self.add_hooks_for_validation([], X_valid, y_valid)
 
         num_steps = int(
-            X_train.shape[0] * self.validation_split /
+            X_train.shape[0] * (1 - self.validation_split) /
             self.batch_size * self.epochs
         )
         self.model.train(
             input_fn=train_input_fn,
-            max_steps=100000,
-            # hooks=[validation_hook]
+            max_steps=num_steps,
+            hooks=hooks
         )
-        exit()
+
+    def add_hooks_for_validation(self, hooks, X_valid, y_valid):
+        every_n_steps = 1000
+        validation_input_fn = TPUNeuralNetworkModel.make_train_input_fn(
+            X_valid, y_valid, 1
+        )
+        return hooks + [
+            tf.train.CheckpointSaverHook(
+                checkpoint_dir=self.outputs_dir,
+                save_steps=every_n_steps
+            ),
+            ValidationHook(
+                TPUNeuralNetworkModel.model_fn,
+                {'batch_size':self.batch_size}, None,
+                validation_input_fn, self.outputs_dir,
+                every_n_steps=every_n_steps
+            )
+        ]
 
     def evaluate(self, X_test, y_test):
         X_scaled = self.x_scaler.transform(X_test)
@@ -315,7 +337,12 @@ class TPUNN(NN):
     MODEL_CLASS = TPUNeuralNetworkModel
 
     def show_live_results(self, outputs_folder, name):
-        self.model.outputs_dir = os.path.join(outputs_folder, 'checkpoints')
+        checkpoints_dir = os.path.join(outputs_folder, 'checkpoints')
+        try:
+            shutil.rmtree(checkpoints_dir)
+        except FileNotFoundError:
+            pass
+        self.model.outputs_dir = checkpoints_dir
 
     def model_summary(self):
         PriceModel.model_summary(self)
