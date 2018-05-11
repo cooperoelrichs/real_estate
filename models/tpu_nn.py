@@ -29,9 +29,9 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
     USE_TPU = False
 
     def __init__(
-        self, input_dim, epochs, batch_size, validation_split
+        self, learning_rate, input_dim, epochs, batch_size, validation_split
     ):
-
+        self.learning_rate = learning_rate
         self.input_dim = input_dim
         self.epochs = epochs
         self.batch_size = batch_size
@@ -64,7 +64,7 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         )
 
         estimator = tf.contrib.tpu.TPUEstimator(
-            model_fn=TPUNeuralNetworkModel.model_fn,
+            model_fn=self.build_model_fn(),
             use_tpu=TPUNeuralNetworkModel.USE_TPU,
             train_batch_size=self.batch_size,
             eval_batch_size=self.batch_size,
@@ -74,85 +74,79 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         )
         return estimator
 
-    def model_fn(features, labels, mode, config, params):
-        '''
-        Based on:
-        https://github.com/tensorflow/tpu/blob/master/models/experimental
-        /cifar_keras/cifar_keras.py
-        '''
-        model = TPUNeuralNetworkModel.model_tensor(features)
+    def build_model_fn(self):
+        def model_fn(features, labels, mode, config, params):
+            model = TPUNeuralNetworkModel.model_tensor(features)
 
-        if mode == tf.estimator.ModeKeys.PREDICT:
-            return tf.contrib.tpu.TPUEstimatorSpec(
-                mode=mode,
-                predictions={'predictions': model}
-            )
-        elif mode == tf.estimator.ModeKeys.TRAIN:
-            loss = TPUNeuralNetworkModel.loss_tensor(features, labels)
-            metrics = (TPUNeuralNetworkModel.metrics_fn, (labels, model))
+            if mode == tf.estimator.ModeKeys.PREDICT:
+                return tf.contrib.tpu.TPUEstimatorSpec(
+                    mode=mode,
+                    predictions={'predictions': model}
+                )
+            elif mode == tf.estimator.ModeKeys.TRAIN:
+                loss = TPUNeuralNetworkModel.loss_tensor(model, labels)
+                metrics = (TPUNeuralNetworkModel.metrics_fn, (labels, model))
 
-            optimizer = tf.train.AdamOptimizer()
-            if TPUNeuralNetworkModel.USE_TPU:
-                optimizer = tpu_optimizer.CrossShardOptimizer(optimizer)
+                optimizer = tf.train.AdamOptimizer(
+                    learning_rate=self.learning_rate
+                )
+                if TPUNeuralNetworkModel.USE_TPU:
+                    optimizer = tpu_optimizer.CrossShardOptimizer(optimizer)
 
-            train_op = optimizer.minimize(
-                loss, global_step=tf.train.get_global_step()
-            )
-            return tf.contrib.tpu.TPUEstimatorSpec(
-                mode=mode,
-                loss=loss,
-                train_op=train_op,
-                predictions={'predictions': model},
-                eval_metrics=metrics
-            )
-        elif mode == tf.estimator.ModeKeys.EVAL:
-            loss = TPUNeuralNetworkModel.loss_tensor(features, labels)
-            mae = tf.metrics.mean_absolute_error(
-                labels=labels,
-                predictions=model
-            )
-            return tf.estimator.EstimatorSpec(
-                mode=mode,
-                loss=loss,
-                predictions={'predictions': model},
-                eval_metric_ops={'mae': mae}
-            )
-        else:
-            raise ValueError("Mode '%s' not supported." % mode)
+                train_op = optimizer.minimize(
+                    loss, global_step=tf.train.get_global_step()
+                )
+                return tf.contrib.tpu.TPUEstimatorSpec(
+                    mode=mode,
+                    loss=loss,
+                    train_op=train_op,
+                    predictions={'predictions': model},
+                    eval_metrics=metrics
+                )
+            elif mode == tf.estimator.ModeKeys.EVAL:
+                loss = TPUNeuralNetworkModel.loss_tensor(model, labels)
+                return tf.estimator.EstimatorSpec(
+                    mode=mode,
+                    loss=loss,
+                    predictions={'predictions': model},
+                    eval_metric_ops={
+                        'mae': tf.metrics.mean_absolute_error(labels, model),
+                        'r2': TPUNeuralNetworkModel.r2_metric(labels, model)
+                    }
+                )
+            else:
+                raise ValueError("Mode '%s' not supported." % mode)
+        return model_fn
 
     def model_tensor(features):
         # model = Input(tensor=features)
-        print(type(features), features)
-        x = Dense(units=512, activation=tf.nn.relu)
-        print(type(x), x)
         model = Dense(units=512, activation=tf.nn.relu)(features)
+        model = Dense(units=512, activation=tf.nn.relu)(model)
+        model = Dense(units=256, activation=tf.nn.relu)(model)
         model = Dense(units=1)(model)
         model = model[:, 0]
         return model
 
-    def loss_tensor(features, labels):
-        model = TPUNeuralNetworkModel.model_tensor(features)
+    def loss_tensor(model, labels):
         loss = tf.losses.mean_squared_error(
             labels=labels,
             predictions=model
         )
         return loss
 
-    def metrics_fn(y_true, y_pred):
+    def metrics_fn(labels, predictions):
         return {
-            'mae': tf.metrics.mean_absolute_error(y_true, y_pred),
-            # 'r2': TPUNeuralNetworkModel.r2_metric(y_true, y_pred)
+            'mae': tf.metrics.mean_absolute_error(labels, predictions),
+            'r2': TPUNeuralNetworkModel.r2_metric(labels, predictions)
         }
 
-    def r2_metric(
-        labels,
-        predictions,
-        weights=None,
-        metrics_collections=None,
-        updates_collections=None
-    ):
-        r2 = SimpleNeuralNetworkModel.r2(labels, predictions)
-        return r2, None
+    def r2_metric(labels, predictions):
+        sse, update_op1 = tf.metrics.mean_squared_error(labels, predictions)
+        sst, update_op2 = tf.metrics.mean_squared_error(
+            labels, tf.fill(tf.shape(labels), tf.reduce_mean(labels))
+        )
+        r2_value = tf.subtract(1.0, tf.div(sse, sst))
+        return r2_value, tf.group(update_op2, update_op1)
 
     def fit(self, X, y):
         self.x_scaler, X_scaled = self.new_scaler(X)
@@ -192,7 +186,7 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
                 save_steps=every_n_steps
             ),
             ValidationHook(
-                TPUNeuralNetworkModel.model_fn,
+                self.build_model_fn(),
                 {'batch_size':self.batch_size}, None,
                 validation_input_fn, self.outputs_dir,
                 every_n_steps=every_n_steps

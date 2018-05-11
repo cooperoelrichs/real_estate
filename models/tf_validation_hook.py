@@ -34,9 +34,7 @@ class ValidationHook(tf.train.SessionRunHook):
     def after_run(self, run_context, run_values):
         if self._should_trigger:
             print('Running an evaluation epoch.')
-            self._eval_estimator.evaluate(
-                self._input_fn
-            )
+            self._eval_estimator.evaluate(self._input_fn)
             self._timer.update_last_triggered_step(self._iter_count)
             print('Evaluation complete.')
         self._iter_count += 1
