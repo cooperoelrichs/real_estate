@@ -26,7 +26,7 @@ tf.logging.set_verbosity(tf.logging.DEBUG)
 
 
 class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
-    USE_TPU = False
+    USE_TPU = True
 
     def __init__(
         self, learning_rate, input_dim, epochs, batch_size, validation_split
@@ -54,8 +54,13 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         # self.optimizer
 
     def compile_model(self):
+        tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
+            # tpu=[os.environ['TPU_NAME']]
+            tpu='c-oelrichs'
+        )
+
         run_config = tf.contrib.tpu.RunConfig(
-            # cluster=tpu_cluster_resolver,
+            cluster=tpu_cluster_resolver,
             model_dir=self.outputs_dir,
             session_config=tf.ConfigProto(
                 allow_soft_placement=True, log_device_placement=True
@@ -91,7 +96,9 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
                     learning_rate=self.learning_rate
                 )
                 if TPUNeuralNetworkModel.USE_TPU:
-                    optimizer = tpu_optimizer.CrossShardOptimizer(optimizer)
+                    optimizer = tf.contrib.tpu.CrossShardOptimizer(
+                        optimizer
+                    )
 
                 train_op = optimizer.minimize(
                     loss, global_step=tf.train.get_global_step()
@@ -276,6 +283,12 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
                 features = dict(zip(feature_keys, batch[:len(feature_keys)]))
 
             target = batch[-1]
+
+            print(features.shape, target.shape)
+            features.set_shape((params['batch_size'], 16))
+            target.set_shape((params['batch_size'],))
+            print(features.shape, target.shape)
+
             return features, target
         return input_fn
 
