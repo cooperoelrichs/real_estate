@@ -26,16 +26,20 @@ tf.logging.set_verbosity(tf.logging.DEBUG)
 
 
 class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
-    USE_TPU = True
+    USE_TPU = False
 
     def __init__(
-        self, learning_rate, input_dim, epochs, batch_size, validation_split
+        self, learning_rate, input_dim, epochs, batch_size, validation_split,
+        outputs_dir, bucket_dir
     ):
         self.learning_rate = learning_rate
         self.input_dim = input_dim
         self.epochs = epochs
         self.batch_size = batch_size
         self.validation_split = validation_split
+
+        self.outputs_dir = outputs_dir
+        self.bucket_dir = bucket_dir
 
         # TODO:
         # self.verbosity
@@ -53,30 +57,56 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         # self.loss
         # self.optimizer
 
+    def get_dir(self):
+        return TPUNeuralNetworkModel.choose_dir(
+            self.USE_TPU, self.outputs_dir, self.bucket_dir
+        )
+
+    def choose_dir(use_tpu, outputs_dir, bucket_dir):
+        if use_tpu:
+            return bucket_dir
+        else:
+            return outputs_dir
+
     def compile_model(self):
-        tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
-            # tpu=[os.environ['TPU_NAME']]
-            tpu='c-oelrichs'
-        )
+        if self.USE_TPU:
+            tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
+                # tpu=[os.environ['TPU_NAME']]
+                tpu='c-oelrichs'
+            )
 
-        run_config = tf.contrib.tpu.RunConfig(
-            cluster=tpu_cluster_resolver,
-            model_dir=self.outputs_dir,
-            session_config=tf.ConfigProto(
-                allow_soft_placement=True, log_device_placement=True
-            ),
-            tpu_config=tf.contrib.tpu.TPUConfig(),
-        )
+            run_config = tf.contrib.tpu.RunConfig(
+                cluster=tpu_cluster_resolver,
+                model_dir=self.get_dir(),
+                session_config=tf.ConfigProto(
+                    allow_soft_placement=True, log_device_placement=True
+                ),
+                tpu_config=tf.contrib.tpu.TPUConfig()
+            )
 
-        estimator = tf.contrib.tpu.TPUEstimator(
-            model_fn=self.build_model_fn(),
-            use_tpu=TPUNeuralNetworkModel.USE_TPU,
-            train_batch_size=self.batch_size,
-            eval_batch_size=self.batch_size,
-            # params={"data_dir": FLAGS.data_dir},
-            model_dir=self.outputs_dir,
-            config=run_config
-        )
+            estimator = tf.contrib.tpu.TPUEstimator(
+                model_fn=self.build_model_fn(),
+                use_tpu=TPUNeuralNetworkModel.USE_TPU,
+                train_batch_size=self.batch_size,
+                eval_batch_size=self.batch_size,
+                model_dir=self.get_dir(),
+                config=run_config
+            )
+        else:
+            run_config = tf.contrib.tpu.RunConfig(
+                model_dir=self.get_dir(),
+                session_config=tf.ConfigProto(
+                    allow_soft_placement=True, log_device_placement=True
+                ),
+            )
+            estimator = tf.contrib.tpu.TPUEstimator(
+                model_fn=self.build_model_fn(),
+                use_tpu=TPUNeuralNetworkModel.USE_TPU,
+                train_batch_size=self.batch_size,
+                eval_batch_size=self.batch_size,
+                model_dir=self.get_dir(),
+                config=run_config
+            )
         return estimator
 
     def build_model_fn(self):
@@ -168,7 +198,7 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
 
         self.model = self.compile_model()
         train_input_fn = TPUNeuralNetworkModel.make_train_input_fn(
-            X_train, y_train, self.epochs
+            X_train, y_train, self.epochs, self.get_dir()
         )
         hooks = self.add_hooks_for_validation([], X_valid, y_valid)
 
@@ -185,17 +215,17 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
     def add_hooks_for_validation(self, hooks, X_valid, y_valid):
         every_n_steps = 1000
         validation_input_fn = TPUNeuralNetworkModel.make_train_input_fn(
-            X_valid, y_valid, 1
+            X_valid, y_valid, 1, self.get_dir()
         )
         return hooks + [
             tf.train.CheckpointSaverHook(
-                checkpoint_dir=self.outputs_dir,
+                checkpoint_dir=self.get_dir(),
                 save_steps=every_n_steps
             ),
             ValidationHook(
                 self.build_model_fn(),
                 {'batch_size':self.batch_size}, None,
-                validation_input_fn, self.outputs_dir,
+                validation_input_fn, self.get_dir(),
                 every_n_steps=every_n_steps
             )
         ]
@@ -240,56 +270,98 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
     def make_train_input_fn(
         X, y,
         epochs,
-        shuffle=False,
-        queue_capacity=10000,
-        num_threads=1
+        run_dir
     ):
-        import collections
+
+        # 1. If self.USE_TPU
+        # 2. If required upload data to a google bucket
+        # 3. Create a tpu_minst like data input function that uses this bucket
+        #    and uses a tf data object
+        # 4. return this function
+
+        run_data_dir = os.path.join(run_dir, 'data-train')
+        if not tf.gfile.Exists(run_data_dir):
+            tf.gfile.MakeDirs(run_data_dir)
+
+        for name, a in (('X', X), ('y', np.expand_dims(y, axis=1))):
+            data_file_name = os.path.join(run_data_dir, name)
+            print(data_file_name)
+            writer = tf.python_io.TFRecordWriter(data_file_name)
+
+            for i in range(a.shape[0]):
+                float_list = tf.train.FloatList(value=a[i, :])
+                feature = tf.train.Feature(float_list=float_list)
+                features = tf.train.Features(feature={'values':feature})
+                example = tf.train.Example(features=features)
+                writer.write(example.SerializeToString())
+            writer.close()
+
+        X = tf.data.TFRecordDataset(filenames=(os.path.join(run_data_dir, 'X')))
+        y = tf.data.TFRecordDataset(filenames=(os.path.join(run_data_dir, 'y')))
+        ds = tf.data.Dataset.zip((X, y))
+
+        print(run_dir)
+        print(run_data_dir)
+        print(os.path.join(run_data_dir, 'X'))
+
+        print(X)
+        print(y)
+        print(ds)
+
         def input_fn(params):
             batch_size = params['batch_size']
-
-            ordered_dict_data = ordered_dict_data = collections.OrderedDict(
-                {'__direct_np_input__': X}
+            ds.cache().repeat().shuffle(buffer_size=50000).apply(
+                tf.contrib.data.batch_and_drop_remainder(batch_size)
             )
-            feature_keys = list(ordered_dict_data.keys())
+            X_batch, y_batch = ds.make_one_shot_iterator().get_next()
+            return X_batch, y_batch
 
-            target_key = 'y'
-            if target_key in ordered_dict_data:
-                raise ValueError("X should not contain 'y'.")
-
-            ordered_dict_data[target_key] = y
-
-            queue = feeding_functions._enqueue_data(
-                ordered_dict_data,
-                queue_capacity,
-                shuffle=shuffle,
-                num_threads=num_threads,
-                enqueue_size=batch_size,
-                num_epochs=epochs
-            )
-
-            batch = (
-                queue.dequeue_many(batch_size)
-                if epochs is None else queue.dequeue_up_to(batch_size)
-            )
-
-            if batch:
-                # Remove the first `Tensor` in `batch`, which is the row number.
-                batch.pop(0)
-
-            if isinstance(X, np.ndarray):
-                features = batch[0]
-            else:
-                features = dict(zip(feature_keys, batch[:len(feature_keys)]))
-
-            target = batch[-1]
-
-            print(features.shape, target.shape)
-            features.set_shape((params['batch_size'], 16))
-            target.set_shape((params['batch_size'],))
-            print(features.shape, target.shape)
-
-            return features, target
+        # import collections
+        # def input_fn(params):
+        #     batch_size = params['batch_size']
+        #
+        #     ordered_dict_data = ordered_dict_data = collections.OrderedDict(
+        #         {'__direct_np_input__': X}
+        #     )
+        #     feature_keys = list(ordered_dict_data.keys())
+        #
+        #     target_key = 'y'
+        #     if target_key in ordered_dict_data:
+        #         raise ValueError("X should not contain 'y'.")
+        #
+        #     ordered_dict_data[target_key] = y
+        #
+        #     queue = feeding_functions._enqueue_data(
+        #         ordered_dict_data,
+        #         queue_capacity,
+        #         shuffle=shuffle,
+        #         num_threads=num_threads,
+        #         enqueue_size=batch_size,
+        #         num_epochs=epochs
+        #     )
+        #
+        #     batch = (
+        #         queue.dequeue_many(batch_size)
+        #         if epochs is None else queue.dequeue_up_to(batch_size)
+        #     )
+        #
+        #     if batch:
+        #         # Remove the first `Tensor` in `batch`, which is the row number.
+        #         batch.pop(0)
+        #
+        #     if isinstance(X, np.ndarray):
+        #         features = batch[0]
+        #     else:
+        #         features = dict(zip(feature_keys, batch[:len(feature_keys)]))
+        #
+        #     target = batch[-1]
+        #
+        #     print(features.shape, target.shape)
+        #     features.set_shape((params['batch_size'], 16))
+        #     target.set_shape((params['batch_size'],))
+        #     print(features.shape, target.shape)
+        #
+        #     return features, target
         return input_fn
 
     def make_test_input_fn(
@@ -344,12 +416,13 @@ class TPUNN(NN):
     MODEL_CLASS = TPUNeuralNetworkModel
 
     def show_live_results(self, outputs_folder, name):
-        checkpoints_dir = os.path.join(outputs_folder, 'checkpoints')
-        try:
-            shutil.rmtree(checkpoints_dir)
-        except FileNotFoundError:
-            pass
-        self.model.outputs_dir = checkpoints_dir
+        PriceModel.show_live_results(self, outputs_folder, name)
+    #     checkpoints_dir = os.path.join(outputs_folder, 'checkpoints')
+    #     try:
+    #         shutil.rmtree(checkpoints_dir)
+    #     except FileNotFoundError:
+    #         pass
+    #     self.model.outputs_dir = checkpoints_dir
 
     def model_summary(self):
         PriceModel.model_summary(self)
