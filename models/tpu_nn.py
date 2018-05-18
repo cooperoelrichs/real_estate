@@ -13,7 +13,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from tensorflow.python.layers.base import InputSpec as Input
 from tensorflow.python.layers.core import Dense
 
-from tensorflow.python.estimator.inputs.queues import feeding_functions
+from tensorflow.python.framework.errors_impl import NotFoundError
 
 from real_estate.models.simple_nn import (
     NN, SimpleNeuralNetworkModel, EmptyKerasModel
@@ -39,7 +39,7 @@ _SignalsHelper.as_tensor_list = _signals_helper_as_tensor_list
 
 
 class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
-    USE_TPU = True
+    USE_TPU = False
 
     def __init__(
         self, learning_rate, input_dim, epochs, batch_size, validation_split,
@@ -75,8 +75,8 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
 
     def del_model_dir(self):
         try:
-            shutil.rmtree(self.model_dir)
-        except FileNotFoundError:
+            tf.gfile.DeleteRecursively(self.get_dir())
+        except NotFoundError:
             pass
 
     def get_dir(self):
