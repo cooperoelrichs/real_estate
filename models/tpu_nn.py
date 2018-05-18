@@ -22,11 +22,11 @@ from real_estate.models.price_model import PriceModel
 from real_estate.models.tf_validation_hook import ValidationHook
 
 
-tf.logging.set_verbosity(tf.logging.DEBUG)
+tf.logging.set_verbosity(tf.logging.INFO)
 
 
 class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
-    USE_TPU = False
+    USE_TPU = True
 
     def __init__(
         self, learning_rate, input_dim, epochs, batch_size, validation_split,
@@ -86,7 +86,7 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
 
             run_config = tf.contrib.tpu.RunConfig(
                 cluster=tpu_cluster_resolver,
-                model_dir=os.self.get_dir(),
+                model_dir=self.get_dir(),
                 session_config=tf.ConfigProto(
                     allow_soft_placement=True, log_device_placement=True
                 ),
@@ -98,6 +98,7 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
                 use_tpu=TPUNeuralNetworkModel.USE_TPU,
                 train_batch_size=self.batch_size,
                 eval_batch_size=self.batch_size,
+                predict_batch_size=self.batch_size,
                 model_dir=self.get_dir(),
                 config=run_config
             )
@@ -113,6 +114,7 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
                 use_tpu=TPUNeuralNetworkModel.USE_TPU,
                 train_batch_size=self.batch_size,
                 eval_batch_size=self.batch_size,
+                predict_batch_size=self.batch_size,
                 model_dir=self.get_dir(),
                 config=run_config
             )
@@ -205,18 +207,18 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         y_train = y[validation_split:]
         y_valid = y[:validation_split]
 
-        self.train_ds_dir = TPUNeuralNetworkModel.save_train_dataset(
+        train_ds_dir = TPUNeuralNetworkModel.save_train_dataset(
             X_train, y_train, self.get_dir()
         )
-        self.eval_ds_dir = TPUNeuralNetworkModel.save_eval_dataset(
+        eval_ds_dir = TPUNeuralNetworkModel.save_eval_dataset(
             X_valid, y_train, self.get_dir()
         )
 
         self.model = self.compile_model()
         train_input_fn = TPUNeuralNetworkModel.make_train_input_fn(
-            self.train_ds_dir, self.epochs
+            train_ds_dir, self.epochs
         )
-        hooks = self.add_hooks_for_validation([], self.eval_ds_dir)
+        hooks = self.add_hooks_for_validation([], eval_ds_dir)
 
         num_steps = int(
             X_train.shape[0] * (1 - self.validation_split) /
@@ -269,28 +271,36 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         X_scaled = X_scaled.astype(np.float32)
         y_test = y_test.astype(np.float32)
 
-        input_fn = TPUNeuralNetworkModel.make_test_input_fn(
-            X_scaled, self.batch_size
+        predict_ds_dir = TPUNeuralNetworkModel.save_predict_dataset(
+            X_scaled, self.get_dir()
+        )
+        predict_input_fn = TPUNeuralNetworkModel.make_predict_input_fn(
+            predict_ds_dir, self.epochs
         )
 
-        y_pred = self.model.predict(input_fn)
+        y_pred = self.model.predict(predict_input_fn)
         y_pred = np.array([a['predictions'] for a in y_pred])
         return r2_score(y_test, y_pred)
 
-    def predict(self, X_pred):
-        X_scaled = self.x_scaler.transform(X_pred)
-        X_scaled = X_scaled.astype(np.float32)
-        y_pred = self.model.predict(input_fn, yield_single_examples=False)
-        return y_pred
+    # def predict(self, X_pred):
+    #     X_scaled = self.x_scaler.transform(X_pred)
+    #     X_scaled = X_scaled.astype(np.float32)
+    #     y_pred = self.model.predict(input_fn, yield_single_examples=False)
+    #     return y_pred
 
     def save_train_dataset(X, y, run_dir):
         return TPUNeuralNetworkModel.save_tf_dataset(
-            X, y, run_dir, 'train'
+            X, y, run_dir, tf.estimator.ModeKeys.TRAIN
         )
 
     def save_eval_dataset(X, y, run_dir):
         return TPUNeuralNetworkModel.save_tf_dataset(
-            X, y, run_dir, 'eval'
+            X, y, run_dir, tf.estimator.ModeKeys.EVAL
+        )
+
+    def save_predict_dataset(X, run_dir):
+        return TPUNeuralNetworkModel.save_tf_dataset(
+            X, None, run_dir, tf.estimator.ModeKeys.PREDICT
         )
 
     def save_tf_dataset(X, y, run_dir, mode):
@@ -298,7 +308,15 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         if not tf.gfile.Exists(run_data_dir):
             tf.gfile.MakeDirs(run_data_dir)
 
-        for name, a in (('X', X), ('y', np.expand_dims(y, axis=1))):
+        if (
+            mode == tf.estimator.ModeKeys.TRAIN or
+            mode == tf.estimator.ModeKeys.EVAL
+        ):
+            datasets = (('X', X), ('y', np.expand_dims(y, axis=1)))
+        elif mode == tf.estimator.ModeKeys.PREDICT:
+            datasets = (('X', X),)
+
+        for name, a in datasets:
             data_file_name = os.path.join(run_data_dir, name)
             print(data_file_name)
             writer = tf.python_io.TFRecordWriter(data_file_name)
@@ -313,6 +331,16 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         return run_data_dir
 
     def make_train_input_fn(ds_dir, epochs):
+        return TPUNeuralNetworkModel.make_input_fn(
+            ds_dir, epochs, tf.estimator.ModeKeys.TRAIN
+        )
+
+    def make_predict_input_fn(ds_dir, epochs):
+        return TPUNeuralNetworkModel.make_input_fn(
+            ds_dir, epochs, tf.estimator.ModeKeys.PREDICT
+        )
+
+    def make_input_fn(ds_dir, epochs, mode):
         print(tf.gfile.Exists(os.path.join(ds_dir, 'X')))
         print(tf.gfile.Exists(os.path.join(ds_dir, 'y')))
 
@@ -328,9 +356,12 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
 
         X = tf.data.TFRecordDataset(filenames=os.path.join(ds_dir, 'X'))
         X = X.map(decode)
-        y = tf.data.TFRecordDataset(filenames=os.path.join(ds_dir, 'y'))
-        y = y.map(decode)
-        ds = tf.data.Dataset.zip((X, y))
+        if mode == tf.estimator.ModeKeys.PREDICT:
+            ds = X
+        else:
+            y = tf.data.TFRecordDataset(filenames=os.path.join(ds_dir, 'y'))
+            y = y.map(decode)
+            ds = tf.data.Dataset.zip((X, y))
 
         ####
         # batch_size = 3
@@ -345,16 +376,27 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         ####
 
         def input_fn(params):
+            if mode == tf.estimator.ModeKeys.PREDICT:
+                return ds
+
             batch_size = params['batch_size']
             # .shuffle(buffer_size=int(1e6))
             batched_ds = ds.prefetch(buffer_size=batch_size
             ).repeat(count=epochs
             ).shuffle(buffer_size=50000
             ).apply(tf.contrib.data.batch_and_drop_remainder(batch_size))
-            X_batch, y_batch = batched_ds.make_one_shot_iterator().get_next()
+
+            batch = batched_ds.make_one_shot_iterator().get_next()
+            # if mode == tf.estimator.ModeKeys.PREDICT:
+            #     X_batch = batch
+            #     X_batch.set_shape((batch_size, 16))
+            #     return X_batch
+            # else:
+            X_batch, y_batch = batch
             X_batch.set_shape((batch_size, 16))
             y_batch = tf.reshape(y_batch, (batch_size,))
             return X_batch, y_batch
+
         return input_fn
 
     # def make_train_input_fn(X, y, epochs, run_dir):
@@ -406,40 +448,40 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
     #         return features, target
     #     return input_fn
 
-    def make_test_input_fn(
-        X,
-        batch_size,
-        shuffle=False,
-        queue_capacity=10000,
-        num_threads=1,
-    ):
-        import collections
-        def input_fn(params):
-            ordered_dict_data = ordered_dict_data = collections.OrderedDict(
-                {'__direct_np_input__': X}
-            )
-            feature_keys = list(ordered_dict_data.keys())
-            queue = feeding_functions._enqueue_data(
-                ordered_dict_data,
-                queue_capacity,
-                shuffle=False,
-                num_threads=num_threads,
-                enqueue_size=batch_size,
-                num_epochs=1
-            )
-
-            batch = queue.dequeue_up_to(batch_size)
-            if batch:
-                # Remove the first `Tensor` in `batch`, which is the row number.
-                batch.pop(0)
-
-            if isinstance(X, np.ndarray):
-                features = batch[0]
-            else:
-                features = dict(zip(feature_keys, batch[:len(feature_keys)]))
-            return features
-
-        return input_fn
+    # def make_test_input_fn(
+    #     X,
+    #     batch_size,
+    #     shuffle=False,
+    #     queue_capacity=10000,
+    #     num_threads=1,
+    # ):
+    #     import collections
+    #     def input_fn(params):
+    #         ordered_dict_data = ordered_dict_data = collections.OrderedDict(
+    #             {'__direct_np_input__': X}
+    #         )
+    #         feature_keys = list(ordered_dict_data.keys())
+    #         queue = feeding_functions._enqueue_data(
+    #             ordered_dict_data,
+    #             queue_capacity,
+    #             shuffle=False,
+    #             num_threads=num_threads,
+    #             enqueue_size=batch_size,
+    #             num_epochs=1
+    #         )
+    #
+    #         batch = queue.dequeue_up_to(batch_size)
+    #         if batch:
+    #             # Remove the first `Tensor` in `batch`, which is the row number.
+    #             batch.pop(0)
+    #
+    #         if isinstance(X, np.ndarray):
+    #             features = batch[0]
+    #         else:
+    #             features = dict(zip(feature_keys, batch[:len(feature_keys)]))
+    #         return features
+    #
+    #     return input_fn
 
     # def new_scaler(self, x):
     # def empty_scaler(self, x):
