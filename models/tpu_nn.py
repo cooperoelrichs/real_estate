@@ -25,6 +25,19 @@ from real_estate.models.tf_validation_hook import ValidationHook
 tf.logging.set_verbosity(tf.logging.INFO)
 
 
+def _signals_helper___init__(self, signals):
+    self._signal_keys = []
+    for key in sorted(signals.keys()):
+      self._signal_keys.append(key)
+
+def _signals_helper_as_tensor_list(signals):
+    return [signals[key] for key in sorted(signals.keys())]
+
+from tensorflow.contrib.tpu.python.tpu.tpu_estimator import _SignalsHelper
+_SignalsHelper.__init__ = _signals_helper___init__
+_SignalsHelper.as_tensor_list = _signals_helper_as_tensor_list
+
+
 class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
     USE_TPU = True
 
@@ -167,10 +180,12 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         return model_fn
 
     def model_tensor(features):
-        # model = Input(tensor=features)
-        model = Dense(units=128, activation=tf.nn.relu)(features)
+        model = Dense(units=512, activation=tf.nn.relu)(features)
+        model = Dense(units=1024, activation=tf.nn.relu)(model)
+        model = Dense(units=512, activation=tf.nn.relu)(model)
+        model = Dense(units=512, activation=tf.nn.relu)(model)
+        model = Dense(units=256, activation=tf.nn.relu)(model)
         model = Dense(units=128, activation=tf.nn.relu)(model)
-        model = Dense(units=32, activation=tf.nn.relu)(model)
         model = Dense(units=1)(model)
         model = model[:, 0]
         return model
@@ -344,7 +359,17 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         print(tf.gfile.Exists(os.path.join(ds_dir, 'X')))
         print(tf.gfile.Exists(os.path.join(ds_dir, 'y')))
 
-        def decode(serialized_example):
+        def decode_X(serialized_example):
+            a = tf.parse_single_example(
+                serialized_example,
+                features={'values': tf.FixedLenSequenceFeature(
+                    (16,), tf.float32, allow_missing=True
+                )}
+            )
+            a = a['values']
+            return a
+
+        def decode_y(serialized_example):
             a = tf.parse_single_example(
                 serialized_example,
                 features={'values': tf.FixedLenSequenceFeature(
@@ -353,15 +378,6 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
             )
             a = a['values']
             return a
-
-        X = tf.data.TFRecordDataset(filenames=os.path.join(ds_dir, 'X'))
-        X = X.map(decode)
-        if mode == tf.estimator.ModeKeys.PREDICT:
-            ds = X
-        else:
-            y = tf.data.TFRecordDataset(filenames=os.path.join(ds_dir, 'y'))
-            y = y.map(decode)
-            ds = tf.data.Dataset.zip((X, y))
 
         ####
         # batch_size = 3
@@ -376,112 +392,35 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         ####
 
         def input_fn(params):
+            X = tf.data.TFRecordDataset(filenames=os.path.join(ds_dir, 'X'))
+            X = X.map(decode_X)
+
             if mode == tf.estimator.ModeKeys.PREDICT:
-                return ds
+                return X
+            else:
+                y = tf.data.TFRecordDataset(filenames=os.path.join(ds_dir, 'y'))
+                y = y.map(decode_y)
+                ds = tf.data.Dataset.zip((X, y))
 
-            batch_size = params['batch_size']
-            # .shuffle(buffer_size=int(1e6))
-            batched_ds = ds.prefetch(buffer_size=batch_size
-            ).repeat(count=epochs
-            ).shuffle(buffer_size=50000
-            ).apply(tf.contrib.data.batch_and_drop_remainder(batch_size))
+                batch_size = params['batch_size']
+                batched_ds = ds.prefetch(buffer_size=batch_size
+                ).repeat(count=epochs
+                ).shuffle(buffer_size=50000
+                ).apply(tf.contrib.data.batch_and_drop_remainder(batch_size))
 
-            batch = batched_ds.make_one_shot_iterator().get_next()
-            # if mode == tf.estimator.ModeKeys.PREDICT:
-            #     X_batch = batch
-            #     X_batch.set_shape((batch_size, 16))
-            #     return X_batch
-            # else:
-            X_batch, y_batch = batch
-            X_batch.set_shape((batch_size, 16))
-            y_batch = tf.reshape(y_batch, (batch_size,))
-            return X_batch, y_batch
+                batch = batched_ds.make_one_shot_iterator().get_next()
+                # if mode == tf.estimator.ModeKeys.PREDICT:
+                #     X_batch = batch
+                #     X_batch.set_shape((batch_size, 16))
+                #     return X_batch
+                # else:
+                X_batch, y_batch = batch
+
+                X_batch = tf.reshape(X_batch, (batch_size, 16))
+                y_batch = tf.reshape(y_batch, (batch_size,))
+                return X_batch, y_batch
 
         return input_fn
-
-    # def make_train_input_fn(X, y, epochs, run_dir):
-    #     import collections
-    #     def input_fn(params):
-    #         batch_size = params['batch_size']
-    #
-    #         ordered_dict_data = ordered_dict_data = collections.OrderedDict(
-    #             {'__direct_np_input__': X}
-    #         )
-    #         feature_keys = list(ordered_dict_data.keys())
-    #
-    #         target_key = 'y'
-    #         if target_key in ordered_dict_data:
-    #             raise ValueError("X should not contain 'y'.")
-    #
-    #         ordered_dict_data[target_key] = y
-    #
-    #         queue = feeding_functions._enqueue_data(
-    #             ordered_dict_data,
-    #             queue_capacity,
-    #             shuffle=shuffle,
-    #             num_threads=num_threads,
-    #             enqueue_size=batch_size,
-    #             num_epochs=epochs
-    #         )
-    #
-    #         batch = (
-    #             queue.dequeue_many(batch_size)
-    #             if epochs is None else queue.dequeue_up_to(batch_size)
-    #         )
-    #
-    #         if batch:
-    #             # Remove the first `Tensor` in `batch`, which is the row number.
-    #             batch.pop(0)
-    #
-    #         if isinstance(X, np.ndarray):
-    #             features = batch[0]
-    #         else:
-    #             features = dict(zip(feature_keys, batch[:len(feature_keys)]))
-    #
-    #         target = batch[-1]
-    #
-    #         print(features.shape, target.shape)
-    #         features.set_shape((params['batch_size'], 16))
-    #         target.set_shape((params['batch_size'],))
-    #         print(features.shape, target.shape)
-    #
-    #         return features, target
-    #     return input_fn
-
-    # def make_test_input_fn(
-    #     X,
-    #     batch_size,
-    #     shuffle=False,
-    #     queue_capacity=10000,
-    #     num_threads=1,
-    # ):
-    #     import collections
-    #     def input_fn(params):
-    #         ordered_dict_data = ordered_dict_data = collections.OrderedDict(
-    #             {'__direct_np_input__': X}
-    #         )
-    #         feature_keys = list(ordered_dict_data.keys())
-    #         queue = feeding_functions._enqueue_data(
-    #             ordered_dict_data,
-    #             queue_capacity,
-    #             shuffle=False,
-    #             num_threads=num_threads,
-    #             enqueue_size=batch_size,
-    #             num_epochs=1
-    #         )
-    #
-    #         batch = queue.dequeue_up_to(batch_size)
-    #         if batch:
-    #             # Remove the first `Tensor` in `batch`, which is the row number.
-    #             batch.pop(0)
-    #
-    #         if isinstance(X, np.ndarray):
-    #             features = batch[0]
-    #         else:
-    #             features = dict(zip(feature_keys, batch[:len(feature_keys)]))
-    #         return features
-    #
-    #     return input_fn
 
     # def new_scaler(self, x):
     # def empty_scaler(self, x):
