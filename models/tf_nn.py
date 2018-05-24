@@ -38,7 +38,7 @@ _SignalsHelper.__init__ = _signals_helper___init__
 _SignalsHelper.as_tensor_list = _signals_helper_as_tensor_list
 
 
-class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
+class TFNNModel(SimpleNeuralNetworkModel):
     USE_TPU = False
 
     def __init__(
@@ -80,7 +80,7 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
             pass
 
     def get_dir(self):
-        return TPUNeuralNetworkModel.choose_dir(
+        return TFNNModel.choose_dir(
             self.USE_TPU, self.model_dir, self.bucket_dir
         )
 
@@ -108,7 +108,7 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
 
             estimator = tf.contrib.tpu.TPUEstimator(
                 model_fn=self.build_model_fn(),
-                use_tpu=TPUNeuralNetworkModel.USE_TPU,
+                use_tpu=TFNNModel.USE_TPU,
                 train_batch_size=self.batch_size,
                 eval_batch_size=self.batch_size,
                 predict_batch_size=self.batch_size,
@@ -124,7 +124,7 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
             )
             estimator = tf.contrib.tpu.TPUEstimator(
                 model_fn=self.build_model_fn(),
-                use_tpu=TPUNeuralNetworkModel.USE_TPU,
+                use_tpu=TFNNModel.USE_TPU,
                 train_batch_size=self.batch_size,
                 eval_batch_size=self.batch_size,
                 predict_batch_size=self.batch_size,
@@ -135,7 +135,7 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
 
     def build_model_fn(self):
         def model_fn(features, labels, mode, config, params):
-            model = TPUNeuralNetworkModel.model_tensor(features)
+            model = TFNNModel.model_tensor(features)
 
             if mode == tf.estimator.ModeKeys.PREDICT:
                 return tf.contrib.tpu.TPUEstimatorSpec(
@@ -143,13 +143,13 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
                     predictions={'predictions': model}
                 )
             elif mode == tf.estimator.ModeKeys.TRAIN:
-                loss = TPUNeuralNetworkModel.loss_tensor(model, labels)
-                metrics = (TPUNeuralNetworkModel.metrics_fn, (labels, model))
+                loss = TFNNModel.loss_tensor(model, labels)
+                metrics = (TFNNModel.metrics_fn, (labels, model))
 
                 optimizer = tf.train.AdamOptimizer(
                     learning_rate=self.learning_rate
                 )
-                if TPUNeuralNetworkModel.USE_TPU:
+                if TFNNModel.USE_TPU:
                     optimizer = tf.contrib.tpu.CrossShardOptimizer(
                         optimizer
                     )
@@ -165,14 +165,14 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
                     eval_metrics=metrics
                 )
             elif mode == tf.estimator.ModeKeys.EVAL:
-                loss = TPUNeuralNetworkModel.loss_tensor(model, labels)
+                loss = TFNNModel.loss_tensor(model, labels)
                 return tf.estimator.EstimatorSpec(
                     mode=mode,
                     loss=loss,
                     predictions={'predictions': model},
                     eval_metric_ops={
                         'mae': tf.metrics.mean_absolute_error(labels, model),
-                        'r2': TPUNeuralNetworkModel.r2_metric(labels, model)
+                        'r2': TFNNModel.r2_metric(labels, model)
                     }
                 )
             else:
@@ -180,12 +180,9 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         return model_fn
 
     def model_tensor(features):
-        model = Dense(units=512, activation=tf.nn.relu)(features)
-        model = Dense(units=1024, activation=tf.nn.relu)(model)
-        model = Dense(units=512, activation=tf.nn.relu)(model)
-        model = Dense(units=512, activation=tf.nn.relu)(model)
+        model = Dense(units=256, activation=tf.nn.relu)(features)
         model = Dense(units=256, activation=tf.nn.relu)(model)
-        model = Dense(units=128, activation=tf.nn.relu)(model)
+        model = Dense(units=256, activation=tf.nn.relu)(model)
         model = Dense(units=1)(model)
         model = model[:, 0]
         return model
@@ -200,7 +197,7 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
     def metrics_fn(labels, predictions):
         return {
             'mae': tf.metrics.mean_absolute_error(labels, predictions),
-            'r2': TPUNeuralNetworkModel.r2_metric(labels, predictions)
+            'r2': TFNNModel.r2_metric(labels, predictions)
         }
 
     def r2_metric(labels, predictions):
@@ -222,15 +219,15 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         y_train = y[validation_split:]
         y_valid = y[:validation_split]
 
-        train_ds_dir = TPUNeuralNetworkModel.save_train_dataset(
+        train_ds_dir = TFNNModel.save_train_dataset(
             X_train, y_train, self.get_dir()
         )
-        eval_ds_dir = TPUNeuralNetworkModel.save_eval_dataset(
+        eval_ds_dir = TFNNModel.save_eval_dataset(
             X_valid, y_train, self.get_dir()
         )
 
         self.model = self.compile_model()
-        train_input_fn = TPUNeuralNetworkModel.make_train_input_fn(
+        train_input_fn = TFNNModel.make_train_input_fn(
             train_ds_dir, self.epochs
         )
         hooks = self.add_hooks_for_validation([], eval_ds_dir)
@@ -247,7 +244,7 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
 
     def add_hooks_for_validation(self, hooks, eval_ds):
         every_n_steps = 1000
-        validation_input_fn = TPUNeuralNetworkModel.make_train_input_fn(
+        validation_input_fn = TFNNModel.make_train_input_fn(
             eval_ds, 1
         )
         return hooks + [
@@ -268,7 +265,7 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         X_scaled = X_scaled.astype(np.float32)
         y_test = y_test.astype(np.float32)
 
-        input_fn = TPUNeuralNetworkModel.make_test_input_fn(
+        input_fn = TFNNModel.make_test_input_fn(
             X_scaled, self.batch_size
         )
 
@@ -286,10 +283,10 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         X_scaled = X_scaled.astype(np.float32)
         y_test = y_test.astype(np.float32)
 
-        predict_ds_dir = TPUNeuralNetworkModel.save_predict_dataset(
+        predict_ds_dir = TFNNModel.save_predict_dataset(
             X_scaled, self.get_dir()
         )
-        predict_input_fn = TPUNeuralNetworkModel.make_predict_input_fn(
+        predict_input_fn = TFNNModel.make_predict_input_fn(
             predict_ds_dir, self.epochs
         )
 
@@ -304,17 +301,17 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
     #     return y_pred
 
     def save_train_dataset(X, y, run_dir):
-        return TPUNeuralNetworkModel.save_tf_dataset(
+        return TFNNModel.save_tf_dataset(
             X, y, run_dir, tf.estimator.ModeKeys.TRAIN
         )
 
     def save_eval_dataset(X, y, run_dir):
-        return TPUNeuralNetworkModel.save_tf_dataset(
+        return TFNNModel.save_tf_dataset(
             X, y, run_dir, tf.estimator.ModeKeys.EVAL
         )
 
     def save_predict_dataset(X, run_dir):
-        return TPUNeuralNetworkModel.save_tf_dataset(
+        return TFNNModel.save_tf_dataset(
             X, None, run_dir, tf.estimator.ModeKeys.PREDICT
         )
 
@@ -346,12 +343,12 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
         return run_data_dir
 
     def make_train_input_fn(ds_dir, epochs):
-        return TPUNeuralNetworkModel.make_input_fn(
+        return TFNNModel.make_input_fn(
             ds_dir, epochs, tf.estimator.ModeKeys.TRAIN
         )
 
     def make_predict_input_fn(ds_dir, epochs):
-        return TPUNeuralNetworkModel.make_input_fn(
+        return TFNNModel.make_input_fn(
             ds_dir, epochs, tf.estimator.ModeKeys.PREDICT
         )
 
@@ -435,8 +432,17 @@ class TPUNeuralNetworkModel(SimpleNeuralNetworkModel):
     # def simple_lr_scheduler(learning_rate):
 
 
-class TPUNN(NN):
-    MODEL_CLASS = TPUNeuralNetworkModel
+class TFNN(NN):
+    MODEL_CLASS = TFNNModel
+
+    PARAMS = {
+        'learning_rate': None,
+        'epochs': None,
+        'batch_size': None,
+        'validation_split': 0.2,
+        'outputs_dir': None,
+        'bucket_dir': 'gs://real-estate-modelling-temp-bucket',
+    }
 
     def show_live_results(self, outputs_folder, name):
         PriceModel.show_live_results(self, outputs_folder, name)
