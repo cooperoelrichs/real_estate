@@ -1,6 +1,5 @@
 import os
 import sys
-import shutil
 
 import numpy as np
 from sklearn.metrics import r2_score
@@ -56,6 +55,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
         self.bucket_dir = bucket_dir
 
         self.del_model_dir()
+        self.mk_model_dir()
 
         # TODO:
         # self.verbosity
@@ -78,6 +78,9 @@ class TFNNModel(SimpleNeuralNetworkModel):
             tf.gfile.DeleteRecursively(self.get_dir())
         except NotFoundError:
             pass
+
+    def mk_model_dir(self):
+        tf.gfile.MkDir(self.get_dir())
 
     def get_dir(self):
         return TFNNModel.choose_dir(
@@ -316,31 +319,26 @@ class TFNNModel(SimpleNeuralNetworkModel):
         )
 
     def save_tf_dataset(X, y, run_dir, mode):
-        run_data_dir = os.path.join(run_dir, 'data-' + mode)
-        if not tf.gfile.Exists(run_data_dir):
-            tf.gfile.MakeDirs(run_data_dir)
+        data_file_path = os.path.join(run_dir, 'data-' + mode + '.tfrecords')
+        print(data_file_path)
 
-        if (
-            mode == tf.estimator.ModeKeys.TRAIN or
-            mode == tf.estimator.ModeKeys.EVAL
-        ):
-            datasets = (('X', X), ('y', np.expand_dims(y, axis=1)))
-        elif mode == tf.estimator.ModeKeys.PREDICT:
-            datasets = (('X', X),)
+        with tf.python_io.TFRecordWriter(data_file_path) as writer:
+            for i in range(X.shape[0]):
+                if (mode == tf.estimator.ModeKeys.TRAIN or
+                    mode == tf.estimator.ModeKeys.EVAL):
+                    feature={'X': tf.train.Feature(
+                             float_list=tf.train.FloatList(value=X[i])),
+                             'y': tf.train.Feature(
+                             float_list=tf.train.FloatList(value=[y[i]]))}
+                elif mode == tf.estimator.ModeKeys.PREDICT:
+                    feature={'X': tf.train.Feature(
+                             float_list=tf.train.FloatList(value=X[i]))}
 
-        for name, a in datasets:
-            data_file_name = os.path.join(run_data_dir, name)
-            print(data_file_name)
-            writer = tf.python_io.TFRecordWriter(data_file_name)
+                writer.write(tf.train.Example(
+                    features=tf.train.Features(feature=feature)
+                ).SerializeToString())
 
-            for i in range(a.shape[0]):
-                float_list = tf.train.FloatList(value=a[i, :])
-                feature = tf.train.Feature(float_list=float_list)
-                features = tf.train.Features(feature={'values':feature})
-                example = tf.train.Example(features=features)
-                writer.write(example.SerializeToString())
-            writer.close()
-        return run_data_dir
+        return data_file_path
 
     def make_train_input_fn(ds_dir, epochs):
         return TFNNModel.make_input_fn(
@@ -352,72 +350,71 @@ class TFNNModel(SimpleNeuralNetworkModel):
             ds_dir, epochs, tf.estimator.ModeKeys.PREDICT
         )
 
-    def make_input_fn(ds_dir, epochs, mode):
-        print(tf.gfile.Exists(os.path.join(ds_dir, 'X')))
-        print(tf.gfile.Exists(os.path.join(ds_dir, 'y')))
+    def make_input_fn(data_file_path, epochs, mode):
+        X_WIDTH = 16
+        assert tf.gfile.Exists(data_file_path)
 
-        def decode_X(serialized_example):
-            a = tf.parse_single_example(
-                serialized_example,
-                features={'values': tf.FixedLenSequenceFeature(
-                    (16,), tf.float32, allow_missing=True
-                )}
-            )
-            a = a['values']
-            return a
+        def decode_x_and_y(example):
+            features = {
+                'X': tf.FixedLenSequenceFeature(
+                    shape=(X_WIDTH,), dtype=tf.float32, allow_missing=True),
+                'y': tf.FixedLenSequenceFeature(
+                    shape=(1,), dtype=tf.float32, allow_missing=True)
+            }
+            parsed_features = tf.parse_single_example(example, features)
+            return (parsed_features['X'][0], parsed_features['y'][0, 0])
 
-        def decode_y(serialized_example):
-            a = tf.parse_single_example(
-                serialized_example,
-                features={'values': tf.FixedLenSequenceFeature(
-                    [], tf.float32, allow_missing=True
-                )}
-            )
-            a = a['values']
-            return a
-
-        ####
-        # batch_size = 3
-        # ds = ds.cache().repeat().shuffle(buffer_size=50000).apply(
-        #     tf.contrib.data.batch_and_drop_remainder(batch_size)
-        # )
-        # batch = ds.make_one_shot_iterator().get_next()
-        #
-        # sess = tf.Session()
-        # print(sess.run(batch))
-        # exit()
-        ####
+        def decode_x_only(example):
+            features = {
+                'X': tf.FixedLenSequenceFeature(
+                    shape=(X_WIDTH,), dtype=tf.float32, allow_missing=True),
+            }
+            parsed_features = tf.parse_single_example(example, features)
+            return parsed_features['X'][0]
 
         def input_fn(params):
-            X = tf.data.TFRecordDataset(filenames=os.path.join(ds_dir, 'X'))
-            X = X.map(decode_X)
+            batch_size = params['batch_size']
+            ds = tf.data.TFRecordDataset(data_file_path)
+            ds = ds.shuffle(buffer_size=int(1e6))
+            ds = ds.repeat(epochs)
+            ds = ds.prefetch(buffer_size=batch_size)
+            # ds = ds.apply(tf.contrib.data.batch_and_drop_remainder(batch_size))
 
-            if mode == tf.estimator.ModeKeys.PREDICT:
-                return X
-            else:
-                y = tf.data.TFRecordDataset(filenames=os.path.join(ds_dir, 'y'))
-                y = y.map(decode_y)
-                ds = tf.data.Dataset.zip((X, y))
+            if (mode == tf.estimator.ModeKeys.TRAIN or
+                mode == tf.estimator.ModeKeys.EVAL):
+                ds = ds.apply(tf.contrib.data.map_and_batch(
+                    decode_x_and_y,
+                    batch_size,
+                    num_parallel_batches=1,
+                    # drop_remainder=True
+                ))
+            elif mode == tf.estimator.ModeKeys.PREDICT:
+                ds = ds.apply(tf.contrib.data.map_and_batch(
+                    decode_x_only,
+                    batch_size,
+                    num_parallel_batches=1,
+                    # drop_remainder=True
+                ))
 
-                batch_size = params['batch_size']
-                batched_ds = ds.prefetch(buffer_size=batch_size
-                ).repeat(count=epochs
-                ).shuffle(buffer_size=50000
-                ).apply(tf.contrib.data.batch_and_drop_remainder(batch_size))
-
-                batch = batched_ds.make_one_shot_iterator().get_next()
-                # if mode == tf.estimator.ModeKeys.PREDICT:
-                #     X_batch = batch
-                #     X_batch.set_shape((batch_size, 16))
-                #     return X_batch
-                # else:
-                X_batch, y_batch = batch
-
-                X_batch = tf.reshape(X_batch, (batch_size, 16))
-                y_batch = tf.reshape(y_batch, (batch_size,))
-                return X_batch, y_batch
-
+            iterator = ds.make_one_shot_iterator()
+            batch = iterator.get_next()
+            X_batch, y_batch = batch
+            # X_batch = tf.reshape(X_batch, (batch_size, 16))
+            # y_batch = tf.reshape(y_batch, (batch_size,))
+            return X_batch, y_batch
         return input_fn
+
+    ####
+    # batch_size = 3
+    # ds = ds.cache().repeat().shuffle(buffer_size=50000).apply(
+    #     tf.contrib.data.batch_and_drop_remainder(batch_size)
+    # )
+    # batch = ds.make_one_shot_iterator().get_next()
+    #
+    # sess = tf.Session()
+    # print(sess.run(batch))
+    # exit()
+    ####
 
     # def new_scaler(self, x):
     # def empty_scaler(self, x):
