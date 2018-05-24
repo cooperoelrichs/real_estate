@@ -83,11 +83,11 @@ class TFNNModel(SimpleNeuralNetworkModel):
         tf.gfile.MkDir(self.get_dir())
 
     def get_dir(self):
-        return TFNNModel.choose_dir(
+        return self.choose_dir(
             self.USE_TPU, self.model_dir, self.bucket_dir
         )
 
-    def choose_dir(use_tpu, model_dir, bucket_dir):
+    def choose_dir(self, use_tpu, model_dir, bucket_dir):
         if use_tpu:
             return bucket_dir
         else:
@@ -111,7 +111,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
 
             estimator = tf.contrib.tpu.TPUEstimator(
                 model_fn=self.build_model_fn(),
-                use_tpu=TFNNModel.USE_TPU,
+                use_tpu=self.USE_TPU,
                 train_batch_size=self.batch_size,
                 eval_batch_size=self.batch_size,
                 predict_batch_size=self.batch_size,
@@ -127,7 +127,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
             )
             estimator = tf.contrib.tpu.TPUEstimator(
                 model_fn=self.build_model_fn(),
-                use_tpu=TFNNModel.USE_TPU,
+                use_tpu=self.USE_TPU,
                 train_batch_size=self.batch_size,
                 eval_batch_size=self.batch_size,
                 predict_batch_size=self.batch_size,
@@ -138,7 +138,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
 
     def build_model_fn(self):
         def model_fn(features, labels, mode, config, params):
-            model = TFNNModel.model_tensor(features)
+            model = self.model_tensor(features)
 
             if mode == tf.estimator.ModeKeys.PREDICT:
                 return tf.contrib.tpu.TPUEstimatorSpec(
@@ -146,13 +146,13 @@ class TFNNModel(SimpleNeuralNetworkModel):
                     predictions={'predictions': model}
                 )
             elif mode == tf.estimator.ModeKeys.TRAIN:
-                loss = TFNNModel.loss_tensor(model, labels)
-                metrics = (TFNNModel.metrics_fn, (labels, model))
+                loss = self.loss_tensor(model, labels)
+                metrics = (self.metrics_fn, (labels, model))
 
                 optimizer = tf.train.AdamOptimizer(
                     learning_rate=self.learning_rate
                 )
-                if TFNNModel.USE_TPU:
+                if self.USE_TPU:
                     optimizer = tf.contrib.tpu.CrossShardOptimizer(
                         optimizer
                     )
@@ -168,21 +168,21 @@ class TFNNModel(SimpleNeuralNetworkModel):
                     eval_metrics=metrics
                 )
             elif mode == tf.estimator.ModeKeys.EVAL:
-                loss = TFNNModel.loss_tensor(model, labels)
+                loss = self.loss_tensor(model, labels)
                 return tf.estimator.EstimatorSpec(
                     mode=mode,
                     loss=loss,
                     predictions={'predictions': model},
                     eval_metric_ops={
                         'mae': tf.metrics.mean_absolute_error(labels, model),
-                        'r2': TFNNModel.r2_metric(labels, model)
+                        'r2': self.r2_metric(labels, model)
                     }
                 )
             else:
                 raise ValueError("Mode '%s' not supported." % mode)
         return model_fn
 
-    def model_tensor(features):
+    def model_tensor(self, features):
         model = Dense(units=256, activation=tf.nn.relu)(features)
         model = Dense(units=256, activation=tf.nn.relu)(model)
         model = Dense(units=256, activation=tf.nn.relu)(model)
@@ -190,20 +190,20 @@ class TFNNModel(SimpleNeuralNetworkModel):
         model = model[:, 0]
         return model
 
-    def loss_tensor(model, labels):
+    def loss_tensor(self, model, labels):
         loss = tf.losses.mean_squared_error(
             labels=labels,
             predictions=model
         )
         return loss
 
-    def metrics_fn(labels, predictions):
+    def metrics_fn(self, labels, predictions):
         return {
             'mae': tf.metrics.mean_absolute_error(labels, predictions),
-            'r2': TFNNModel.r2_metric(labels, predictions)
+            'r2': self.r2_metric(labels, predictions)
         }
 
-    def r2_metric(labels, predictions):
+    def r2_metric(self, labels, predictions):
         sse, update_op1 = tf.metrics.mean_squared_error(labels, predictions)
         sst, update_op2 = tf.metrics.mean_squared_error(
             labels, tf.fill(tf.shape(labels), tf.reduce_mean(labels))
@@ -222,15 +222,15 @@ class TFNNModel(SimpleNeuralNetworkModel):
         y_train = y[validation_split:]
         y_valid = y[:validation_split]
 
-        train_ds_dir = TFNNModel.save_train_dataset(
+        train_ds_dir = self.save_train_dataset(
             X_train, y_train, self.get_dir()
         )
-        eval_ds_dir = TFNNModel.save_eval_dataset(
+        eval_ds_dir = self.save_eval_dataset(
             X_valid, y_train, self.get_dir()
         )
 
         self.model = self.compile_model()
-        train_input_fn = TFNNModel.make_train_input_fn(
+        train_input_fn = self.make_train_input_fn(
             train_ds_dir, self.epochs
         )
         hooks = self.add_hooks_for_validation([], eval_ds_dir)
@@ -247,7 +247,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
 
     def add_hooks_for_validation(self, hooks, eval_ds):
         every_n_steps = 1000
-        validation_input_fn = TFNNModel.make_train_input_fn(
+        validation_input_fn = self.make_train_input_fn(
             eval_ds, 1
         )
         return hooks + [
@@ -268,7 +268,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
         X_scaled = X_scaled.astype(np.float32)
         y_test = y_test.astype(np.float32)
 
-        input_fn = TFNNModel.make_test_input_fn(
+        input_fn = self.make_test_input_fn(
             X_scaled, self.batch_size
         )
 
@@ -286,10 +286,10 @@ class TFNNModel(SimpleNeuralNetworkModel):
         X_scaled = X_scaled.astype(np.float32)
         y_test = y_test.astype(np.float32)
 
-        predict_ds_dir = TFNNModel.save_predict_dataset(
+        predict_ds_dir = self.save_predict_dataset(
             X_scaled, self.get_dir()
         )
-        predict_input_fn = TFNNModel.make_predict_input_fn(
+        predict_input_fn = self.make_predict_input_fn(
             predict_ds_dir, self.epochs
         )
 
@@ -303,22 +303,22 @@ class TFNNModel(SimpleNeuralNetworkModel):
     #     y_pred = self.model.predict(input_fn, yield_single_examples=False)
     #     return y_pred
 
-    def save_train_dataset(X, y, run_dir):
-        return TFNNModel.save_tf_dataset(
+    def save_train_dataset(self, X, y, run_dir):
+        return self.save_tf_dataset(
             X, y, run_dir, tf.estimator.ModeKeys.TRAIN
         )
 
-    def save_eval_dataset(X, y, run_dir):
-        return TFNNModel.save_tf_dataset(
+    def save_eval_dataset(self, X, y, run_dir):
+        return self.save_tf_dataset(
             X, y, run_dir, tf.estimator.ModeKeys.EVAL
         )
 
-    def save_predict_dataset(X, run_dir):
-        return TFNNModel.save_tf_dataset(
+    def save_predict_dataset(self, X, run_dir):
+        return self.save_tf_dataset(
             X, None, run_dir, tf.estimator.ModeKeys.PREDICT
         )
 
-    def save_tf_dataset(X, y, run_dir, mode):
+    def save_tf_dataset(self, X, y, run_dir, mode):
         data_file_path = os.path.join(run_dir, 'data-' + mode + '.tfrecords')
         print(data_file_path)
 
@@ -340,17 +340,17 @@ class TFNNModel(SimpleNeuralNetworkModel):
 
         return data_file_path
 
-    def make_train_input_fn(ds_dir, epochs):
-        return TFNNModel.make_input_fn(
+    def make_train_input_fn(self, ds_dir, epochs):
+        return self.make_input_fn(
             ds_dir, epochs, tf.estimator.ModeKeys.TRAIN
         )
 
-    def make_predict_input_fn(ds_dir, epochs):
-        return TFNNModel.make_input_fn(
+    def make_predict_input_fn(selfds_dir, epochs):
+        return self.make_input_fn(
             ds_dir, epochs, tf.estimator.ModeKeys.PREDICT
         )
 
-    def make_input_fn(data_file_path, epochs, mode):
+    def make_input_fn(self, data_file_path, epochs, mode):
         X_WIDTH = 16
         assert tf.gfile.Exists(data_file_path)
 
