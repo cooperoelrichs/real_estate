@@ -40,18 +40,26 @@ class TFNNModelFromNumpy(TFNNModel):
         def input_fn(params):
             batch_size = params['batch_size']
 
-            ds = tf.data.Dataset.from_tensor_slices((datas[0], datas[1].T))
+            if (mode == tf.estimator.ModeKeys.TRAIN or
+                mode == tf.estimator.ModeKeys.EVAL):
+                data = (datas[0], datas[1].T)
+            elif mode == tf.estimator.ModeKeys.PREDICT:
+                data = datas[0]
+
+            ds = tf.data.Dataset.from_tensor_slices(data)
             ds = ds.shuffle(buffer_size=int(1e6))
             ds = ds.repeat(epochs)
             ds = ds.prefetch(buffer_size=batch_size)
-            # ds = ds.apply(tf.contrib.data.batch_and_drop_remainder(batch_size))
             ds = ds.batch(batch_size=batch_size)
             iterator = ds.make_one_shot_iterator()
             batch = iterator.get_next()
-            X_batch, y_batch = batch
-            # X_batch = tf.reshape(X_batch, (batch_size, 16))
-            # y_batch = tf.reshape(y_batch, (batch_size,))
-            return X_batch, y_batch
+
+            if (mode == tf.estimator.ModeKeys.TRAIN or
+                mode == tf.estimator.ModeKeys.EVAL):
+                X_batch, y_batch = batch
+                return X_batch, y_batch
+            elif mode == tf.estimator.ModeKeys.PREDICT:
+                return batch
 
         return input_fn
 

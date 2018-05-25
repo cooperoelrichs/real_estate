@@ -42,7 +42,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
 
     def __init__(
         self, learning_rate, input_dim, epochs, batch_size, validation_split,
-        outputs_dir, bucket_dir
+        outputs_dir, bucket_dir, evaluate
     ):
         self.learning_rate = learning_rate
         self.input_dim = input_dim
@@ -53,6 +53,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
         # self.outputs_dir = outputs_dir
         self.model_dir = os.path.join(outputs_dir, 'model')
         self.bucket_dir = bucket_dir
+        self.evaluate = evaluate
 
         self.del_model_dir()
         self.mk_model_dir()
@@ -233,7 +234,11 @@ class TFNNModel(SimpleNeuralNetworkModel):
         train_input_fn = self.make_train_input_fn(
             train_ds_dir, self.epochs
         )
-        hooks = self.add_hooks_for_validation([], eval_ds_dir)
+
+        if self.evaluate:
+            hooks = self.add_hooks_for_validation([], eval_ds_dir)
+        else:
+            hooks = []
 
         num_steps = int(
             X_train.shape[0] * (1 - self.validation_split) /
@@ -290,7 +295,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
             X_scaled, self.get_dir()
         )
         predict_input_fn = self.make_predict_input_fn(
-            predict_ds_dir, self.epochs
+            predict_ds_dir
         )
 
         y_pred = self.model.predict(predict_input_fn)
@@ -345,9 +350,9 @@ class TFNNModel(SimpleNeuralNetworkModel):
             ds_dir, epochs, tf.estimator.ModeKeys.TRAIN
         )
 
-    def make_predict_input_fn(selfds_dir, epochs):
+    def make_predict_input_fn(self, ds_dir):
         return self.make_input_fn(
-            ds_dir, epochs, tf.estimator.ModeKeys.PREDICT
+            ds_dir, 1, tf.estimator.ModeKeys.PREDICT
         )
 
     def make_input_fn(self, data_file_path, epochs, mode):
@@ -398,10 +403,15 @@ class TFNNModel(SimpleNeuralNetworkModel):
 
             iterator = ds.make_one_shot_iterator()
             batch = iterator.get_next()
-            X_batch, y_batch = batch
-            # X_batch = tf.reshape(X_batch, (batch_size, 16))
-            # y_batch = tf.reshape(y_batch, (batch_size,))
-            return X_batch, y_batch
+
+            if (mode == tf.estimator.ModeKeys.TRAIN or
+                mode == tf.estimator.ModeKeys.EVAL):
+                X_batch, y_batch = batch
+                # X_batch = tf.reshape(X_batch, (batch_size, 16))
+                # y_batch = tf.reshape(y_batch, (batch_size,))
+                return X_batch, y_batch
+            elif mode == tf.estimator.ModeKeys.PREDICT:
+                return batch
         return input_fn
 
     ####
@@ -439,6 +449,7 @@ class TFNN(NN):
         'validation_split': 0.2,
         'outputs_dir': None,
         'bucket_dir': 'gs://real-estate-modelling-temp-bucket',
+        'evaluate': True
     }
 
     def show_live_results(self, outputs_folder, name):
