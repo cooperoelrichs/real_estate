@@ -42,7 +42,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
 
     def __init__(
         self, learning_rate, input_dim, epochs, batch_size, validation_split,
-        outputs_dir, bucket_dir, evaluate
+        outputs_dir, bucket_dir, evaluate=True
     ):
         self.learning_rate = learning_rate
         self.input_dim = input_dim
@@ -236,7 +236,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
         )
 
         if self.evaluate:
-            hooks = self.add_hooks_for_validation([], eval_ds_dir)
+            self.add_hooks_for_validation([], eval_ds_dir)
         else:
             hooks = []
 
