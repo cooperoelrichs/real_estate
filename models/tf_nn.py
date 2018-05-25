@@ -226,7 +226,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
             X_train, y_train, self.get_dir()
         )
         eval_ds_dir = self.save_eval_dataset(
-            X_valid, y_train, self.get_dir()
+            X_valid, y_valid, self.get_dir()
         )
 
         self.model = self.compile_model()
