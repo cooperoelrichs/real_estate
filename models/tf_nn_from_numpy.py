@@ -37,8 +37,6 @@ class TFNNModelFromNumpy(TFNNModel):
             assert tf.gfile.Exists(file)
             datas.append(np.loadtxt(file, dtype=np.float32, delimiter=','))
 
-        print([a.shape for a in datas])
-
         def input_fn(params):
             batch_size = params['batch_size']
 
