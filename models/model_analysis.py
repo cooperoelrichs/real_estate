@@ -142,7 +142,7 @@ class ModelAnalysis():
         log, log_file,
         outputs_dir, test_name
     ):
-        print('\nScoring combination %i of %i.' % indicies)
+        print('Scoring combination %i of %i.' % indicies)
         model = model_class(
             xy.X.values, xy.y.values,
             xy.X.columns.values,
