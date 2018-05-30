@@ -185,8 +185,8 @@ class TFNNModel(SimpleNeuralNetworkModel):
 
     def model_tensor(self, features):
         model = Dense(units=256, activation=tf.nn.relu)(features)
-        model = Dense(units=256, activation=tf.nn.relu)(model)
-        model = Dense(units=256, activation=tf.nn.relu)(model)
+        model = Dense(units=64, activation=tf.nn.relu)(model)
+        model = Dense(units=32, activation=tf.nn.relu)(model)
         model = Dense(units=1)(model)
         model = model[:, 0]
         return model
@@ -380,26 +380,17 @@ class TFNNModel(SimpleNeuralNetworkModel):
         def input_fn(params):
             batch_size = params['batch_size']
             ds = tf.data.TFRecordDataset(data_file_path)
-            ds = ds.shuffle(buffer_size=int(1e6))
-            ds = ds.repeat(epochs)
-            ds = ds.prefetch(buffer_size=batch_size)
-            # ds = ds.apply(tf.contrib.data.batch_and_drop_remainder(batch_size))
 
             if (mode == tf.estimator.ModeKeys.TRAIN or
                 mode == tf.estimator.ModeKeys.EVAL):
-                ds = ds.apply(tf.contrib.data.map_and_batch(
-                    decode_x_and_y,
-                    batch_size,
-                    num_parallel_batches=1,
-                    # drop_remainder=True
-                ))
+                ds = ds.map(decode_x_and_y, num_parallel_calls=8)
             elif mode == tf.estimator.ModeKeys.PREDICT:
-                ds = ds.apply(tf.contrib.data.map_and_batch(
-                    decode_x_only,
-                    batch_size,
-                    num_parallel_batches=1,
-                    # drop_remainder=True
-                ))
+                ds = ds.map(decode_x_and_y, num_parallel_calls=8)
+
+            ds = ds.cache()
+            ds = ds.apply(tf.contrib.data.shuffle_and_repeat(batch_size*10, epochs))
+            ds = ds.apply(tf.contrib.data.batch_and_drop_remainder(batch_size))
+            ds = ds.prefetch(buffer_size=1)
 
             iterator = ds.make_one_shot_iterator()
             batch = iterator.get_next()
@@ -407,8 +398,6 @@ class TFNNModel(SimpleNeuralNetworkModel):
             if (mode == tf.estimator.ModeKeys.TRAIN or
                 mode == tf.estimator.ModeKeys.EVAL):
                 X_batch, y_batch = batch
-                # X_batch = tf.reshape(X_batch, (batch_size, 16))
-                # y_batch = tf.reshape(y_batch, (batch_size,))
                 return X_batch, y_batch
             elif mode == tf.estimator.ModeKeys.PREDICT:
                 return batch
