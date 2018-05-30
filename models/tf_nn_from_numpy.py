@@ -47,10 +47,9 @@ class TFNNModelFromNumpy(TFNNModel):
                 data = datas[0]
 
             ds = tf.data.Dataset.from_tensor_slices(data)
-            ds = ds.shuffle(buffer_size=int(1e6))
-            ds = ds.repeat(epochs)
-            ds = ds.prefetch(buffer_size=batch_size)
-            ds = ds.batch(batch_size=batch_size)
+            ds = ds.apply(tf.contrib.data.shuffle_and_repeat(batch_size*10, epochs))
+            ds = ds.apply(tf.contrib.data.batch_and_drop_remainder(batch_size))
+            ds = ds.prefetch(buffer_size=1)
             iterator = ds.make_one_shot_iterator()
             batch = iterator.get_next()
 
