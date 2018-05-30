@@ -184,8 +184,11 @@ class TFNNModel(SimpleNeuralNetworkModel):
         return model_fn
 
     def model_tensor(self, features):
-        model = Dense(units=256, activation=tf.nn.relu)(features)
-        model = Dense(units=64, activation=tf.nn.relu)(model)
+        model = Dense(units=1024, activation=tf.nn.relu)(features)
+        model = Dense(units=1024, activation=tf.nn.relu)(model)
+        model = Dense(units=512, activation=tf.nn.relu)(model)
+        model = Dense(units=256, activation=tf.nn.relu)(model)
+        model = Dense(units=256, activation=tf.nn.relu)(model)
         model = Dense(units=32, activation=tf.nn.relu)(model)
         model = Dense(units=1)(model)
         model = model[:, 0]
