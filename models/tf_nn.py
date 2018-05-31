@@ -239,7 +239,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
         )
 
         if self.evaluate:
-            self.add_hooks_for_validation([], eval_ds_dir)
+            hooks = self.add_hooks_for_validation([], eval_ds_dir)
         else:
             hooks = []
 
@@ -247,6 +247,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
             X_train.shape[0] * (1 - self.validation_split) /
             self.batch_size * self.epochs
         )
+
         self.model.train(
             input_fn=train_input_fn,
             max_steps=num_steps,
@@ -440,7 +441,7 @@ class TFNN(NN):
         'batch_size': None,
         'validation_split': 0.2,
         'outputs_dir': None,
-        'bucket_dir': 'gs://real-estate-modelling-temp-bucket',
+        'bucket_dir': 'gs://real-estate-modelling-temp-bucket/model',
         'evaluate': True
     }
 
