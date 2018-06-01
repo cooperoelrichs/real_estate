@@ -18,7 +18,6 @@ from real_estate.models.simple_nn import (
     NN, SimpleNeuralNetworkModel, EmptyKerasModel
 )
 from real_estate.models.price_model import PriceModel
-from real_estate.models.tf_validation_hook import ValidationHook
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -183,13 +182,10 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 raise ValueError("Mode '%s' not supported." % mode)
         return model_fn
 
-    def model_tensor(self, features):
-        model = Dense(units=1024, activation=tf.nn.relu)(features)
-        model = Dense(units=1024, activation=tf.nn.relu)(model)
-        model = Dense(units=512, activation=tf.nn.relu)(model)
-        model = Dense(units=256, activation=tf.nn.relu)(model)
-        model = Dense(units=256, activation=tf.nn.relu)(model)
-        model = Dense(units=32, activation=tf.nn.relu)(model)
+    def model_tensor(self, model):
+        model = Dense(units=128, activation=tf.nn.relu)(model)
+        model = Dense(units=128, activation=tf.nn.relu)(model)
+        model = Dense(units=64, activation=tf.nn.relu)(model)
         model = Dense(units=1)(model)
         model = model[:, 0]
         return model
@@ -226,51 +222,35 @@ class TFNNModel(SimpleNeuralNetworkModel):
         y_train = y[validation_split:]
         y_valid = y[:validation_split]
 
-        train_ds_dir = self.save_train_dataset(
-            X_train, y_train, self.get_dir()
-        )
-        eval_ds_dir = self.save_eval_dataset(
-            X_valid, y_valid, self.get_dir()
-        )
+        train_ds_dir = self.save_train_dataset(X_train, y_train, self.get_dir())
+        eval_ds_dir = self.save_eval_dataset(X_valid, y_valid, self.get_dir())
 
         self.model = self.compile_model()
-        train_input_fn = self.make_train_input_fn(
-            train_ds_dir, self.epochs
-        )
-
-        if self.evaluate:
-            hooks = self.add_hooks_for_validation([], eval_ds_dir)
-        else:
-            hooks = []
+        train_input_fn = self.make_train_input_fn(train_ds_dir, self.epochs)
+        eval_input_fn = self.make_train_input_fn(eval_ds_dir, 1)
 
         num_steps = int(
             X_train.shape[0] * (1 - self.validation_split) /
             self.batch_size * self.epochs
         )
 
-        self.model.train(
-            input_fn=train_input_fn,
-            max_steps=num_steps,
-            hooks=hooks
+        train_spec = tf.estimator.TrainSpec(
+            train_input_fn,
+            max_steps=num_steps
         )
 
-    def add_hooks_for_validation(self, hooks, eval_ds):
-        every_n_steps = 1000
-        validation_input_fn = self.make_train_input_fn(
-            eval_ds, 1
+        eval_spec = tf.estimator.EvalSpec(
+            eval_input_fn,
+            steps=int(num_steps / self.epochs),
+            start_delay_secs=30,
+            throttle_secs=30
         )
-        return hooks + [
-            tf.train.CheckpointSaverHook(
-                checkpoint_dir=self.get_dir(),
-                save_steps=every_n_steps
-            ),
-            ValidationHook(
-                self.build_model_fn(),
-                {'batch_size':self.batch_size}, None,
-                validation_input_fn, self.get_dir(),
-                every_n_steps=every_n_steps
-            )
-        ]
+
+        tf.estimator.train_and_evaluate(
+            self.model,
+            train_spec,
+            eval_spec
+        )
 
     def evaluate(self, X_test, y_test):
         X_scaled = self.x_scaler.transform(X_test)
