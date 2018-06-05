@@ -16,11 +16,11 @@ from tensorflow.python.layers.core import Dense
 from tensorflow.python.framework.errors_impl import NotFoundError
 
 from real_estate.models.simple_nn import (
-    NN, SimpleNeuralNetworkModel, EmptyKerasModel
-)
+    NN, SimpleNeuralNetworkModel, EmptyKerasModel)
 from real_estate.models.price_model import PriceModel
 from real_estate.tf_utilities.train_and_evaluate import train_and_evaluate
 from real_estate.tf_utilities import python3_compatibility_hacks
+from real_estate.tf_utilities.validation_hook import ValidationHook
 
 
 class TFNNModel(SimpleNeuralNetworkModel):
@@ -215,31 +215,12 @@ class TFNNModel(SimpleNeuralNetworkModel):
         )
 
         evaluation_steps = int(X_train.shape[0] / self.batch_size)
-
-        # train_spec = tf.estimator.TrainSpec(
-        #     train_input_fn,
-        #     max_steps=num_steps
-        # )
-
-        # eval_spec = tf.estimator.EvalSpec(
-        #     eval_input_fn,
-        #     steps=int(num_steps / self.epochs),
-        #     start_delay_secs=30,
-        #     throttle_secs=30
-        # )
-
-        train_and_evaluate(
-            self.model,
-            train_input_fn, eval_input_fn,
-            training_steps, evaluation_steps, 1000,
-            self.model_dir
+        hooks = self.add_hooks_for_validation([], eval_ds_dir)
+        self.model.train(
+            input_fn=train_input_fn,
+            max_steps=training_steps,
+            hooks=hooks
         )
-
-        # tf.estimator.train_and_evaluate(
-        #     self.model,
-        #     train_spec,
-        #     eval_spec
-        # )
 
     def evaluate(self, X_test, y_test):
         X_scaled = self.x_scaler.transform(X_test)
@@ -280,6 +261,25 @@ class TFNNModel(SimpleNeuralNetworkModel):
     #     X_scaled = X_scaled.astype(np.float32)
     #     y_pred = self.model.predict(input_fn, yield_single_examples=False)
     #     return y_pred
+
+    def add_hooks_for_validation(self, hooks, eval_ds):
+        every_n_steps = 300
+        validation_input_fn = self.make_train_input_fn(
+            eval_ds, 1
+        )
+        return hooks + [
+            # tf.train.CheckpointSaverHook(
+            #     checkpoint_dir=self.model_dir,
+            #     save_steps=every_n_steps
+            # ),
+            ValidationHook(
+                self.model, self.build_model_fn(),
+                {'batch_size': self.batch_size}, self.batch_size,
+                validation_input_fn, self.model_dir,
+                self.USE_TPU,
+                every_n_steps=every_n_steps,
+            )
+        ]
 
     def save_train_dataset(self, X, y, run_dir):
         return self.save_tf_dataset(
