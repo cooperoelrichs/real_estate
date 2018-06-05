@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.metrics import r2_score
 
 import tensorflow as tf
+tf.logging.set_verbosity(tf.logging.INFO)
 os.environ['TF_CPP_MIN_VLOG_LEVEL'] = '3'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -18,22 +19,8 @@ from real_estate.models.simple_nn import (
     NN, SimpleNeuralNetworkModel, EmptyKerasModel
 )
 from real_estate.models.price_model import PriceModel
-
-
-tf.logging.set_verbosity(tf.logging.INFO)
-
-
-def _signals_helper___init__(self, signals):
-    self._signal_keys = []
-    for key in sorted(signals.keys()):
-      self._signal_keys.append(key)
-
-def _signals_helper_as_tensor_list(signals):
-    return [signals[key] for key in sorted(signals.keys())]
-
-from tensorflow.contrib.tpu.python.tpu.tpu_estimator import _SignalsHelper
-_SignalsHelper.__init__ = _signals_helper___init__
-_SignalsHelper.as_tensor_list = _signals_helper_as_tensor_list
+from real_estate.tf_utilities.train_and_evaluate import train_and_evaluate
+from real_estate.tf_utilities import python3_compatibility_hacks
 
 
 class TFNNModel(SimpleNeuralNetworkModel):
@@ -41,7 +28,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
 
     def __init__(
         self, learning_rate, input_dim, epochs, batch_size, validation_split,
-        outputs_dir, bucket_dir, evaluate=True
+        outputs_dir, bucket_dir
     ):
         self.learning_rate = learning_rate
         self.input_dim = input_dim
@@ -49,10 +36,14 @@ class TFNNModel(SimpleNeuralNetworkModel):
         self.batch_size = batch_size
         self.validation_split = validation_split
 
-        # self.outputs_dir = outputs_dir
-        self.model_dir = os.path.join(outputs_dir, 'model')
-        self.bucket_dir = bucket_dir
-        self.evaluate = evaluate
+        if self.USE_TPU:
+            model_dir = os.path.join(bucket_dir, 'model')
+        else:
+            model_dir = os.path.join(outputs_dir, 'model')
+
+        self.model_dir = model_dir
+        # self.train_dir = os.path.join(model_dir, 'train')
+        # self.eval_dir = os.path.join(model_dir, 'eval')
 
         self.del_model_dir()
         self.mk_model_dir()
@@ -75,23 +66,12 @@ class TFNNModel(SimpleNeuralNetworkModel):
 
     def del_model_dir(self):
         try:
-            tf.gfile.DeleteRecursively(self.get_dir())
+            tf.gfile.DeleteRecursively(self.model_dir)
         except NotFoundError:
             pass
 
     def mk_model_dir(self):
-        tf.gfile.MkDir(self.get_dir())
-
-    def get_dir(self):
-        return self.choose_dir(
-            self.USE_TPU, self.model_dir, self.bucket_dir
-        )
-
-    def choose_dir(self, use_tpu, model_dir, bucket_dir):
-        if use_tpu:
-            return bucket_dir
-        else:
-            return model_dir
+        tf.gfile.MkDir(self.model_dir)
 
     def compile_model(self):
         if self.USE_TPU:
@@ -102,7 +82,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
 
             run_config = tf.contrib.tpu.RunConfig(
                 cluster=tpu_cluster_resolver,
-                model_dir=self.get_dir(),
+                model_dir=self.model_dir,
                 session_config=tf.ConfigProto(
                     allow_soft_placement=True, log_device_placement=True
                 ),
@@ -115,12 +95,12 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 train_batch_size=self.batch_size,
                 eval_batch_size=self.batch_size,
                 predict_batch_size=self.batch_size,
-                model_dir=self.get_dir(),
+                model_dir=self.model_dir,
                 config=run_config
             )
         else:
             run_config = tf.contrib.tpu.RunConfig(
-                model_dir=self.get_dir(),
+                model_dir=self.model_dir,
                 session_config=tf.ConfigProto(
                     allow_soft_placement=True, log_device_placement=True
                 ),
@@ -131,7 +111,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 train_batch_size=self.batch_size,
                 eval_batch_size=self.batch_size,
                 predict_batch_size=self.batch_size,
-                model_dir=self.get_dir(),
+                model_dir=self.model_dir,
                 config=run_config
             )
         return estimator
@@ -147,7 +127,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 )
             elif mode == tf.estimator.ModeKeys.TRAIN:
                 loss = self.loss_tensor(model, labels)
-                metrics = (self.metrics_fn, (labels, model))
+                # metrics = (self.metrics_fn, (labels, model))
 
                 optimizer = tf.train.AdamOptimizer(
                     learning_rate=self.learning_rate
@@ -165,7 +145,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
                     loss=loss,
                     train_op=train_op,
                     predictions={'predictions': model},
-                    eval_metrics=metrics
+                    # eval_metrics=metrics
                 )
             elif mode == tf.estimator.ModeKeys.EVAL:
                 loss = self.loss_tensor(model, labels)
@@ -222,35 +202,44 @@ class TFNNModel(SimpleNeuralNetworkModel):
         y_train = y[validation_split:]
         y_valid = y[:validation_split]
 
-        train_ds_dir = self.save_train_dataset(X_train, y_train, self.get_dir())
-        eval_ds_dir = self.save_eval_dataset(X_valid, y_valid, self.get_dir())
+        train_ds_dir = self.save_train_dataset(X_train, y_train, self.model_dir)
+        eval_ds_dir = self.save_eval_dataset(X_valid, y_valid, self.model_dir)
 
         self.model = self.compile_model()
         train_input_fn = self.make_train_input_fn(train_ds_dir, self.epochs)
         eval_input_fn = self.make_train_input_fn(eval_ds_dir, 1)
 
-        num_steps = int(
+        training_steps = int(
             X_train.shape[0] * (1 - self.validation_split) /
             self.batch_size * self.epochs
         )
 
-        train_spec = tf.estimator.TrainSpec(
-            train_input_fn,
-            max_steps=num_steps
-        )
+        evaluation_steps = int(X_train.shape[0] / self.batch_size)
 
-        eval_spec = tf.estimator.EvalSpec(
-            eval_input_fn,
-            steps=int(num_steps / self.epochs),
-            start_delay_secs=30,
-            throttle_secs=30
-        )
+        # train_spec = tf.estimator.TrainSpec(
+        #     train_input_fn,
+        #     max_steps=num_steps
+        # )
 
-        tf.estimator.train_and_evaluate(
+        # eval_spec = tf.estimator.EvalSpec(
+        #     eval_input_fn,
+        #     steps=int(num_steps / self.epochs),
+        #     start_delay_secs=30,
+        #     throttle_secs=30
+        # )
+
+        train_and_evaluate(
             self.model,
-            train_spec,
-            eval_spec
+            train_input_fn, eval_input_fn,
+            training_steps, evaluation_steps, 1000,
+            self.model_dir
         )
+
+        # tf.estimator.train_and_evaluate(
+        #     self.model,
+        #     train_spec,
+        #     eval_spec
+        # )
 
     def evaluate(self, X_test, y_test):
         X_scaled = self.x_scaler.transform(X_test)
@@ -276,7 +265,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
         y_test = y_test.astype(np.float32)
 
         predict_ds_dir = self.save_predict_dataset(
-            X_scaled, self.get_dir()
+            X_scaled, self.model_dir
         )
         predict_input_fn = self.make_predict_input_fn(
             predict_ds_dir
@@ -422,7 +411,6 @@ class TFNN(NN):
         'validation_split': 0.2,
         'outputs_dir': None,
         'bucket_dir': 'gs://real-estate-modelling-temp-bucket/model',
-        'evaluate': True
     }
 
     def show_live_results(self, outputs_folder, name):
