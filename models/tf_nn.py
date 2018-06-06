@@ -9,10 +9,6 @@ tf.logging.set_verbosity(tf.logging.INFO)
 os.environ['TF_CPP_MIN_VLOG_LEVEL'] = '3'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-# Input, Dense, Dropout, Activation, BatchNormalization, PReLU
-from tensorflow.python.layers.base import InputSpec as Input
-from tensorflow.python.layers.core import Dense
-
 from tensorflow.python.framework.errors_impl import NotFoundError
 
 from real_estate.models.simple_nn import (
@@ -27,14 +23,27 @@ class TFNNModel(SimpleNeuralNetworkModel):
     USE_TPU = False
 
     def __init__(
-        self, learning_rate, input_dim, epochs, batch_size, validation_split,
-        outputs_dir, bucket_dir
+        self, learning_rate, learning_rate_decay, momentum,
+        lambda_l1, lambda_l2, max_norm, batch_normalization, dropout_fractions,
+        input_dim, epochs, batch_size, validation_split,
+        layers, optimiser,
+        outputs_dir, bucket_dir, steps_between_evaluations
     ):
-        self.learning_rate = learning_rate
         self.input_dim = input_dim
+        self.layers = layers
+        self.learning_rate = learning_rate
+        self.learning_rate_decay = learning_rate_decay
+        self.momentum = momentum
+        self.lambda_l1 = lambda_l1
+        self.lambda_l2 = lambda_l2
+        self.max_norm = max_norm
+        self.batch_normalization = batch_normalization
+        self.dropout_fractions = dropout_fractions
         self.epochs = epochs
         self.batch_size = batch_size
+        self.optimiser_name = optimiser
         self.validation_split = validation_split
+        self.steps_between_evaluations = steps_between_evaluations
 
         if self.USE_TPU:
             model_dir = os.path.join(bucket_dir, 'model')
@@ -86,7 +95,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 session_config=tf.ConfigProto(
                     allow_soft_placement=True, log_device_placement=True
                 ),
-                tpu_config=tf.contrib.tpu.TPUConfig()
+                tpu_config=tf.contrib.tpu.TPUConfig(num_shards=8)
             )
 
             estimator = tf.contrib.tpu.TPUEstimator(
@@ -127,19 +136,36 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 )
             elif mode == tf.estimator.ModeKeys.TRAIN:
                 loss = self.loss_tensor(model, labels)
-                # metrics = (self.metrics_fn, (labels, model))
 
-                optimizer = tf.train.AdamOptimizer(
-                    learning_rate=self.learning_rate
-                )
-                if self.USE_TPU:
-                    optimizer = tf.contrib.tpu.CrossShardOptimizer(
-                        optimizer
+                if self.optimiser_name == 'sgd':
+                    learning_rate = tf.train.inverse_time_decay(
+                        learning_rate=self.learning_rate,
+                        global_step=tf.train.get_global_step(),
+                        decay_steps=1,
+                        decay_rate=self.learning_rate_decay,
+                    )
+                    optimizer = tf.train.MomentumOptimizer(
+                        learning_rate=learning_rate,
+                        momentum=self.momentum,
+                        use_nesterov=True
                     )
 
-                train_op = optimizer.minimize(
-                    loss, global_step=tf.train.get_global_step()
-                )
+                    clipped_grad_var_pairs = [
+                        (tf.clip_by_value(dx, -1., 1.), x)
+                        for dx, x in optimizer.compute_gradients(loss)
+                    ]
+                    train_op = optimizer.apply_gradients(
+                        clipped_grad_var_pairs,
+                        global_step=tf.train.get_global_step()
+                    )
+                elif self.optimiser_name == 'adam':
+                    optimizer = tf.train.AdamOptimizer(
+                        learning_rate=self.learning_rate,
+                    )
+                    optimizer = self.maybe_to_tpu_optimizer(optimizer)
+                    train_op = optimizer.minimize(
+                        loss, global_step=tf.train.get_global_step()
+                    )
                 return tf.contrib.tpu.TPUEstimatorSpec(
                     mode=mode,
                     loss=loss,
@@ -162,11 +188,42 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 raise ValueError("Mode '%s' not supported." % mode)
         return model_fn
 
+    def maybe_to_tpu_optimizer(optimizer):
+        if self.USE_TPU:
+            return tf.contrib.tpu.CrossShardOptimizer(optimizer)
+        else:
+            return optimizer
+
     def model_tensor(self, model):
-        model = Dense(units=128, activation=tf.nn.relu)(model)
-        model = Dense(units=128, activation=tf.nn.relu)(model)
-        model = Dense(units=64, activation=tf.nn.relu)(model)
-        model = Dense(units=1)(model)
+        self.model_checks()
+        regularizer = tf.contrib.layers.l1_l2_regularizer
+        kernel_initializer = tf.initializers.random_uniform
+        kernel_constraint = tf.keras.constraints.MaxNorm
+
+        for i, units in enumerate(self.layers):
+            model = tf.layers.Dense(
+                units=units,
+                activation=None,
+                kernel_initializer=kernel_initializer(),
+                kernel_regularizer=regularizer(self.lambda_l1, self.lambda_l2),
+                kernel_constraint=kernel_constraint(self.max_norm),
+            )(model)
+
+            if self.batch_normalization is True:
+                model = tf.layers.BatchNormalization()(model)
+
+            model = tf.keras.layers.PReLU()(model)
+
+            if self.dropout_fractions is not None:
+                model = tf.layers.Dropout(self.dropout_fractions[i])(model)
+
+        model = tf.layers.Dense(
+            units=1,
+            activation=None,
+            kernel_initializer=kernel_initializer(),
+            kernel_regularizer=regularizer(self.lambda_l1, self.lambda_l2)
+        )(model)
+
         model = model[:, 0]
         return model
 
@@ -176,6 +233,12 @@ class TFNNModel(SimpleNeuralNetworkModel):
             predictions=model
         )
         return loss
+
+    def model_checks(self):
+        if self.dropout_fractions is not None and (
+            len(self.layers) != len(self.dropout_fractions)
+        ):
+            raise ValueError('Layers and dropout fractions are not consistant.')
 
     def metrics_fn(self, labels, predictions):
         return {
@@ -263,21 +326,21 @@ class TFNNModel(SimpleNeuralNetworkModel):
     #     return y_pred
 
     def add_hooks_for_validation(self, hooks, eval_ds):
-        every_n_steps = 300
+
         validation_input_fn = self.make_train_input_fn(
             eval_ds, 1
         )
         return hooks + [
-            # tf.train.CheckpointSaverHook(
-            #     checkpoint_dir=self.model_dir,
-            #     save_steps=every_n_steps
-            # ),
+            tf.train.CheckpointSaverHook(
+                checkpoint_dir=self.model_dir,
+                save_steps=self.steps_between_evaluations
+            ),
             ValidationHook(
                 self.model, self.build_model_fn(),
                 {'batch_size': self.batch_size}, self.batch_size,
                 validation_input_fn, self.model_dir,
                 self.USE_TPU,
-                every_n_steps=every_n_steps,
+                every_n_steps=self.steps_between_evaluations,
             )
         ]
 
@@ -405,10 +468,22 @@ class TFNN(NN):
     MODEL_CLASS = TFNNModel
 
     PARAMS = {
+        'input_dim': None,
+        'layers': None,
         'learning_rate': None,
+        'learning_rate_decay': None,
+        'momentum': None,
+        'lambda_l1': None,
+        'lambda_l2': None,
+        'max_norm': None,
+        'batch_normalization': None,
+        'dropout_fractions': None,
         'epochs': None,
         'batch_size': None,
+        'optimiser': 'sgd',
         'validation_split': 0.2,
+        'steps_between_evaluations': 1000,
+
         'outputs_dir': None,
         'bucket_dir': 'gs://real-estate-modelling-temp-bucket/model',
     }
