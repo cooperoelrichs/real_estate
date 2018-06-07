@@ -149,11 +149,16 @@ class TFNNModel(SimpleNeuralNetworkModel):
                         momentum=self.momentum,
                         use_nesterov=True
                     )
+                    optimizer = self.maybe_to_tpu_optimizer(optimizer)
 
                     clipped_grad_var_pairs = [
-                        (tf.clip_by_value(dx, -1., 1.), x)
+                        (self.manual_clip_by_value(dx, -1., 1.), x)
                         for dx, x in optimizer.compute_gradients(loss)
                     ]
+                    # dx, x = zip(*optimizer.compute_gradients(loss))
+                    # dx, _ = tf.clip_by_global_norm(dx, 1.0)
+                    # clipped_grad_var_pairs = zip(dx, x)
+
                     train_op = optimizer.apply_gradients(
                         clipped_grad_var_pairs,
                         global_step=tf.train.get_global_step()
@@ -188,11 +193,20 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 raise ValueError("Mode '%s' not supported." % mode)
         return model_fn
 
-    def maybe_to_tpu_optimizer(optimizer):
+    def maybe_to_tpu_optimizer(self, optimizer):
         if self.USE_TPU:
             return tf.contrib.tpu.CrossShardOptimizer(optimizer)
         else:
             return optimizer
+
+    def manual_clip_by_value(self, t, min_val, max_val):
+        '''
+        Avoid Tensorflow's clip_by_value, which uses the ClipByValue op,
+        which isn't supported by XLA in Tensorflow verison 1.8.
+        '''
+        t_min = tf.minimum(t, max_val)
+        t_max = tf.maximum(t_min, min_val)
+        return t_max
 
     def model_tensor(self, model):
         self.model_checks()
