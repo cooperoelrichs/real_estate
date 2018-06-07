@@ -152,7 +152,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
                     optimizer = self.maybe_to_tpu_optimizer(optimizer)
 
                     clipped_grad_var_pairs = [
-                        (self.manual_clip_by_value(dx, -1., 1.), x)
+                        (self.clip_by_value(dx, -1., 1.), x)
                         for dx, x in optimizer.compute_gradients(loss)
                     ]
                     # dx, x = zip(*optimizer.compute_gradients(loss))
@@ -199,11 +199,12 @@ class TFNNModel(SimpleNeuralNetworkModel):
         else:
             return optimizer
 
-    def manual_clip_by_value(self, t, min_val, max_val):
+    def clip_by_value(self, t, min_val, max_val):
         '''
         Avoid Tensorflow's clip_by_value, which uses the ClipByValue op,
         which isn't supported by XLA in Tensorflow verison 1.8.
         '''
+        # TODO: Remove when tf >= 1.9 can be used.
         t_min = tf.minimum(t, max_val)
         t_max = tf.maximum(t_min, min_val)
         return t_max
