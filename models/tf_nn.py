@@ -184,6 +184,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
                     loss=loss,
                     predictions={'predictions': model},
                     eval_metric_ops={
+                        'eval-summaries/mse': tf.metrics.mean_squared_error(labels, model),
                         'eval-summaries/mae': tf.metrics.mean_absolute_error(labels, model),
                         'eval-summaries/r2': self.r2_metric(labels, model)
                     }
@@ -239,7 +240,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
 
     def summary_tensors(self, name_space, model, labels, loss):
         with tf.name_scope(name_space):
-            tf.summary.scalar('loss', loss)
+            tf.summary.scalar('mse', self.mse_value(model, labels))
             tf.summary.scalar('mae', self.mae_value(model, labels))
             tf.summary.scalar('r2', self.r2_value(model, labels))
 
@@ -249,11 +250,14 @@ class TFNNModel(SimpleNeuralNetworkModel):
         ):
             raise ValueError('Layers and dropout fractions are not consistant.')
 
-    def metrics_fn(self, labels, predictions):
-        return {
-            'mae': tf.metrics.mean_absolute_error(labels, predictions),
-            'r2': self.r2_metric(labels, predictions)
-        }
+    # def metrics_fn(self, labels, predictions):
+    #     return {
+    #         'mae': tf.metrics.mean_absolute_error(labels, predictions),
+    #         'r2': self.r2_metric(labels, predictions)
+    #     }
+
+    def mse_value(self, model, labels):
+        return tf.reduce_mean(tf.square(tf.subtract(labels, model)))
 
     def mae_value(self, model, labels):
         return tf.reduce_mean(tf.abs(tf.subtract(labels, model)))
