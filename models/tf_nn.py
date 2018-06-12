@@ -136,6 +136,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 )
             elif mode == tf.estimator.ModeKeys.TRAIN:
                 loss = self.loss_tensor(model, labels)
+                self.summary_tensors('train-summaries', model, labels, loss)
 
                 if self.optimiser_name == 'sgd':
                     learning_rate = tf.train.inverse_time_decay(
@@ -152,17 +153,14 @@ class TFNNModel(SimpleNeuralNetworkModel):
                     optimizer = self.maybe_to_tpu_optimizer(optimizer)
 
                     clipped_grad_var_pairs = [
-                        (self.clip_by_value(dx, -1., 1.), x)
+                        (tf.clip_by_value(dx, -1., 1.), x)
                         for dx, x in optimizer.compute_gradients(loss)
                     ]
-                    # dx, x = zip(*optimizer.compute_gradients(loss))
-                    # dx, _ = tf.clip_by_global_norm(dx, 1.0)
-                    # clipped_grad_var_pairs = zip(dx, x)
-
                     train_op = optimizer.apply_gradients(
                         clipped_grad_var_pairs,
                         global_step=tf.train.get_global_step()
                     )
+
                 elif self.optimiser_name == 'adam':
                     optimizer = tf.train.AdamOptimizer(
                         learning_rate=self.learning_rate,
@@ -171,22 +169,23 @@ class TFNNModel(SimpleNeuralNetworkModel):
                     train_op = optimizer.minimize(
                         loss, global_step=tf.train.get_global_step()
                     )
+
                 return tf.contrib.tpu.TPUEstimatorSpec(
                     mode=mode,
                     loss=loss,
                     train_op=train_op,
                     predictions={'predictions': model},
-                    # eval_metrics=metrics
                 )
             elif mode == tf.estimator.ModeKeys.EVAL:
                 loss = self.loss_tensor(model, labels)
+                self.summary_tensors('eval-summaries', model, labels, loss)
                 return tf.estimator.EstimatorSpec(
                     mode=mode,
                     loss=loss,
                     predictions={'predictions': model},
                     eval_metric_ops={
-                        'mae': tf.metrics.mean_absolute_error(labels, model),
-                        'r2': self.r2_metric(labels, model)
+                        'eval-summaries/mae': tf.metrics.mean_absolute_error(labels, model),
+                        'eval-summaries/r2': self.r2_metric(labels, model)
                     }
                 )
             else:
@@ -198,16 +197,6 @@ class TFNNModel(SimpleNeuralNetworkModel):
             return tf.contrib.tpu.CrossShardOptimizer(optimizer)
         else:
             return optimizer
-
-    def clip_by_value(self, t, min_val, max_val):
-        '''
-        Avoid Tensorflow's clip_by_value, which uses the ClipByValue op,
-        which isn't supported by XLA in Tensorflow verison 1.8.
-        '''
-        # TODO: Remove when tf >= 1.9 can be used.
-        t_min = tf.minimum(t, max_val)
-        t_max = tf.maximum(t_min, min_val)
-        return t_max
 
     def model_tensor(self, model):
         self.model_checks()
@@ -243,11 +232,16 @@ class TFNNModel(SimpleNeuralNetworkModel):
         return model
 
     def loss_tensor(self, model, labels):
-        loss = tf.losses.mean_squared_error(
+        return tf.losses.mean_squared_error(
             labels=labels,
             predictions=model
         )
-        return loss
+
+    def summary_tensors(self, name_space, model, labels, loss):
+        with tf.name_scope(name_space):
+            tf.summary.scalar('loss', loss)
+            tf.summary.scalar('mae', self.mae_value(model, labels))
+            tf.summary.scalar('r2', self.r2_value(model, labels))
 
     def model_checks(self):
         if self.dropout_fractions is not None and (
@@ -260,6 +254,16 @@ class TFNNModel(SimpleNeuralNetworkModel):
             'mae': tf.metrics.mean_absolute_error(labels, predictions),
             'r2': self.r2_metric(labels, predictions)
         }
+
+    def mae_value(self, model, labels):
+        return tf.reduce_mean(tf.abs(tf.subtract(labels, model)))
+
+    def r2_value(self, model, labels):
+        sse = self.mae_value(model, labels)
+        sst = self.mae_value(
+            tf.fill(tf.shape(labels), tf.reduce_mean(labels)), labels
+        )
+        return tf.subtract(1.0, tf.div(sse, sst))
 
     def r2_metric(self, labels, predictions):
         sse, update_op1 = tf.metrics.mean_squared_error(labels, predictions)
