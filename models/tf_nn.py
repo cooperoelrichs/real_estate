@@ -59,19 +59,18 @@ class TFNNModel(SimpleNeuralNetworkModel):
 
         # TODO:
         # self.verbosity
-        # self.learning_rate
-        # self.learning_rate_decay
-        # self.momentum
-        # self.layers
-        # self.lambda_l1
-        # self.lambda_l2
-        # self.dropout_fractions
-        # self.max_norm
-        # self.activation/
-        # self.batch_normalization
+        # self.activation
         # self.kernel_initializer
         # self.loss
         # self.optimizer
+
+        self.model_checks()
+
+    def model_checks(self):
+        if self.dropout_fractions is not None and (
+            len(self.layers) != len(self.dropout_fractions)
+        ):
+            raise ValueError('Layers and dropout fractions are not consistant.')
 
     def del_model_dir(self):
         try:
@@ -136,7 +135,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 )
             elif mode == tf.estimator.ModeKeys.TRAIN:
                 loss = self.loss_tensor(model, labels)
-                self.summary_tensors('train-summaries', model, labels, loss)
+                # self.summary_tensors('train-summaries', model, labels, loss)
 
                 if self.optimiser_name == 'sgd':
                     learning_rate = tf.train.inverse_time_decay(
@@ -153,7 +152,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
                     optimizer = self.maybe_to_tpu_optimizer(optimizer)
 
                     clipped_grad_var_pairs = [
-                        (tf.clip_by_value(dx, -1., 1.), x)
+                        (self.clip_by_value(dx, -1., 1.), x)
                         for dx, x in optimizer.compute_gradients(loss)
                     ]
                     train_op = optimizer.apply_gradients(
@@ -178,7 +177,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 )
             elif mode == tf.estimator.ModeKeys.EVAL:
                 loss = self.loss_tensor(model, labels)
-                self.summary_tensors('eval-summaries', model, labels, loss)
+                # self.summary_tensors('eval-summaries', model, labels, loss)
                 return tf.estimator.EstimatorSpec(
                     mode=mode,
                     loss=loss,
@@ -193,6 +192,9 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 raise ValueError("Mode '%s' not supported." % mode)
         return model_fn
 
+    def clip_by_value(self, tensor, min_val, max_val):
+        return tf.clip_by_value(tensor, min_val, max_val)
+
     def maybe_to_tpu_optimizer(self, optimizer):
         if self.USE_TPU:
             return tf.contrib.tpu.CrossShardOptimizer(optimizer)
@@ -203,7 +205,6 @@ class TFNNModel(SimpleNeuralNetworkModel):
         self.model_checks()
         regularizer = tf.contrib.layers.l1_l2_regularizer
         kernel_initializer = tf.initializers.random_uniform
-        kernel_constraint = tf.keras.constraints.MaxNorm
 
         for i, units in enumerate(self.layers):
             model = tf.layers.Dense(
@@ -211,7 +212,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 activation=None,
                 kernel_initializer=kernel_initializer(),
                 kernel_regularizer=regularizer(self.lambda_l1, self.lambda_l2),
-                kernel_constraint=kernel_constraint(self.max_norm),
+                kernel_constraint=self.maybe_max_norm(),
             )(model)
 
             if self.batch_normalization is True:
@@ -238,17 +239,18 @@ class TFNNModel(SimpleNeuralNetworkModel):
             predictions=model
         )
 
+    def maybe_max_norm(self):
+        if self.max_norm:
+            return tf.keras.constraints.MaxNorm(self.max_norm)
+        else:
+            return None
+
+
     def summary_tensors(self, name_space, model, labels, loss):
         with tf.name_scope(name_space):
             tf.summary.scalar('mse', self.mse_value(model, labels))
             tf.summary.scalar('mae', self.mae_value(model, labels))
             tf.summary.scalar('r2', self.r2_value(model, labels))
-
-    def model_checks(self):
-        if self.dropout_fractions is not None and (
-            len(self.layers) != len(self.dropout_fractions)
-        ):
-            raise ValueError('Layers and dropout fractions are not consistant.')
 
     # def metrics_fn(self, labels, predictions):
     #     return {

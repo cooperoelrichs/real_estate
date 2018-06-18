@@ -12,8 +12,37 @@ from real_estate.models.tf_nn import TFNN, TFNNModel
 tf.logging.set_verbosity(tf.logging.INFO)
 
 
+class ThisOptionUsesTheClipByValueOperationError(ValueError):
+    def __init__(self, option_name):
+        text = (
+            'The option "{}" uses tensorflow\'s ClipByValue operation.'.format(
+                option_name
+            ) +
+            '\nClipByValue is not supported by TPU\'s in TF 1.8.0.'
+        )
+        super().__init__()
+
+
 class TPUTFNNModel(TFNNModel):
     USE_TPU = True
+
+    def model_checks(self):
+        super().model_checks()
+
+        # TF 1.8.0 TPU compatibility checks
+        # TODO: remove these checks for TF 1.9.0
+
+        if self.max_norm:
+            raise ThisOptionUsesTheClipByValueOperationError('max_norm')
+
+    def clip_by_value(self, tensor, min_val, max_val):
+        '''
+        Avoid Tensorflow's clip_by_value, which uses the ClipByValue op,
+        which isn't supported by XLA in Tensorflow verison 1.8.0.
+        '''
+        t_min = tf.minimum(tensor, max_val)
+        t_max = tf.maximum(t_min, min_val)
+        return t_max
 
 
 class TPUTFNN(TFNN):
