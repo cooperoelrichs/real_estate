@@ -449,9 +449,9 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 ds = ds.map(decode_x_and_y, num_parallel_calls=8)
 
             ds = ds.cache()
-            ds = ds.apply(tf.contrib.data.shuffle_and_repeat(batch_size*10, epochs))
+            ds = ds.apply(tf.contrib.data.shuffle_and_repeat(batch_size*100, epochs))
             ds = ds.apply(tf.contrib.data.batch_and_drop_remainder(batch_size))
-            ds = ds.prefetch(buffer_size=1)
+            ds = ds.prefetch(buffer_size=tf.contrib.data.AUTOTUNE)
 
             iterator = ds.make_one_shot_iterator()
             batch = iterator.get_next()
