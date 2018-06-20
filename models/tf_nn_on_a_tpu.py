@@ -25,6 +25,7 @@ class ThisOptionUsesTheClipByValueOperationError(ValueError):
 
 class TPUTFNNModel(TFNNModel):
     USE_TPU = True
+    SUPPORTED_TF_VERSION = '1.8.0'
 
     def model_checks(self):
         super().model_checks()
@@ -32,6 +33,10 @@ class TPUTFNNModel(TFNNModel):
         # TF 1.8.0 TPU compatibility checks
         # TODO: remove these checks for TF 1.9.0
 
+        if tf.__version__ != self.SUPPORTED_TF_VERSION:
+            raise RuntimeError(
+                'Only TF {} is supported. TF version is {}'.format(
+                    self.SUPPORTED_TF_VERSION, tf.__version__))
         if self.max_norm:
             raise ThisOptionUsesTheClipByValueOperationError('max_norm')
 
