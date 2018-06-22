@@ -7,6 +7,7 @@ os.environ['TF_CPP_MIN_VLOG_LEVEL'] = '3'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from real_estate.models.tf_nn import TFNN, TFNNModel
+from real_estate.tf_utilities import python3_compatibility_hacks
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
