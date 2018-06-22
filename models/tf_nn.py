@@ -15,7 +15,6 @@ from real_estate.models.simple_nn import (
     NN, SimpleNeuralNetworkModel, EmptyKerasModel)
 from real_estate.models.price_model import PriceModel
 from real_estate.tf_utilities.train_and_evaluate import train_and_evaluate
-from real_estate.tf_utilities import python3_compatibility_hacks
 from real_estate.tf_utilities.validation_hook import ValidationHook
 
 
@@ -135,7 +134,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 )
             elif mode == tf.estimator.ModeKeys.TRAIN:
                 loss = self.loss_tensor(model, labels)
-                # self.summary_tensors('train-summaries', model, labels, loss)
+                self.summary_tensors('train-summaries', model, labels, loss)
 
                 if self.optimiser_name == 'sgd':
                     learning_rate = tf.train.inverse_time_decay(
@@ -177,7 +176,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 )
             elif mode == tf.estimator.ModeKeys.EVAL:
                 loss = self.loss_tensor(model, labels)
-                # self.summary_tensors('eval-summaries', model, labels, loss)
+                self.summary_tensors('eval-summaries', model, labels, loss)
                 return tf.estimator.EstimatorSpec(
                     mode=mode,
                     loss=loss,
@@ -518,17 +517,3 @@ class TFNN(NN):
 
     def model_summary(self):
         PriceModel.model_summary(self)
-        # tf.summary.tensor_summary(
-        #     'Model',
-        #     self.MODEL_CLASS.loss_tensor(
-        #         tf.placeholder(np.float32, shape=(
-        #             self.model.batch_size, self.model.input_dim
-        #         )),
-        #         tf.placeholder(np.float32, shape=(self.model.batch_size,))
-        #     ),
-        #     summary_description=None,
-        #     collections=None,
-        #     summary_metadata=None,
-        #     family=None,
-        #     display_name=None
-        # )
