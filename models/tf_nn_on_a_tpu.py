@@ -50,6 +50,30 @@ class TPUTFNNModel(TFNNModel):
         t_max = tf.maximum(t_min, min_val)
         return t_max
 
+    def compile_model(self):
+        tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
+            tpu=[os.environ['TPU_NAME']]
+        )
+
+        run_config = tf.contrib.tpu.RunConfig(
+            cluster=tpu_cluster_resolver,
+            model_dir=self.model_dir,
+            session_config=tf.ConfigProto(
+                allow_soft_placement=True, log_device_placement=True
+            ),
+            tpu_config=tf.contrib.tpu.TPUConfig(num_shards=8)
+        )
+
+        estimator = tf.contrib.tpu.TPUEstimator(
+            model_fn=self.build_model_fn(),
+            use_tpu=self.USE_TPU,
+            train_batch_size=self.batch_size,
+            eval_batch_size=self.batch_size,
+            predict_batch_size=self.batch_size,
+            model_dir=self.model_dir,
+            config=run_config
+        )
+
 
 class TPUTFNN(TFNN):
     MODEL_CLASS = TPUTFNNModel

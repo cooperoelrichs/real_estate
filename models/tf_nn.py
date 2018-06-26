@@ -20,6 +20,7 @@ from real_estate.tf_utilities.validation_hook import ValidationHook
 
 class TFNNModel(SimpleNeuralNetworkModel):
     USE_TPU = False
+    USE_GPU = False
 
     def __init__(
         self, learning_rate, learning_rate_decay, momentum,
@@ -81,46 +82,30 @@ class TFNNModel(SimpleNeuralNetworkModel):
         tf.gfile.MkDir(self.model_dir)
 
     def compile_model(self):
-        if self.USE_TPU:
-            tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
-                # tpu=[os.environ['TPU_NAME']]
-                tpu='c-oelrichs'
+        if self.USE_GPU:
+            session_config = tf.ConfigProto(
+                allow_soft_placement=True, log_device_placement=True,
             )
 
-            run_config = tf.contrib.tpu.RunConfig(
-                cluster=tpu_cluster_resolver,
+            run_config = tf.estimator.RunConfig(
                 model_dir=self.model_dir,
-                session_config=tf.ConfigProto(
-                    allow_soft_placement=True, log_device_placement=True
-                ),
-                tpu_config=tf.contrib.tpu.TPUConfig(num_shards=8)
-            )
-
-            estimator = tf.contrib.tpu.TPUEstimator(
-                model_fn=self.build_model_fn(),
-                use_tpu=self.USE_TPU,
-                train_batch_size=self.batch_size,
-                eval_batch_size=self.batch_size,
-                predict_batch_size=self.batch_size,
-                model_dir=self.model_dir,
-                config=run_config
+                session_config=session_config
             )
         else:
-            run_config = tf.contrib.tpu.RunConfig(
-                model_dir=self.model_dir,
+            run_config = tf.estimator.RunConfig(
+                model_dir=self.model_dir
+            ).replace(
                 session_config=tf.ConfigProto(
-                    allow_soft_placement=True, log_device_placement=True
-                ),
+                    log_device_placement=True, device_count={'GPU': 0}
+                )
             )
-            estimator = tf.contrib.tpu.TPUEstimator(
-                model_fn=self.build_model_fn(),
-                use_tpu=self.USE_TPU,
-                train_batch_size=self.batch_size,
-                eval_batch_size=self.batch_size,
-                predict_batch_size=self.batch_size,
-                model_dir=self.model_dir,
-                config=run_config
-            )
+
+        estimator = tf.estimator.Estimator(
+            model_fn=self.build_model_fn(),
+            model_dir=self.model_dir,
+            config=run_config,
+            params={'batch_size': self.batch_size}
+        )
         return estimator
 
     def build_model_fn(self):
@@ -168,12 +153,20 @@ class TFNNModel(SimpleNeuralNetworkModel):
                         loss, global_step=tf.train.get_global_step()
                     )
 
-                return tf.contrib.tpu.TPUEstimatorSpec(
-                    mode=mode,
-                    loss=loss,
-                    train_op=train_op,
-                    predictions={'predictions': model},
-                )
+                if self.USE_TPU:
+                    return tf.contrib.tpu.TPUEstimatorSpec(
+                        mode=mode,
+                        loss=loss,
+                        train_op=train_op,
+                        predictions={'predictions': model},
+                    )
+                else:
+                    return tf.estimator.EstimatorSpec(
+                        mode=mode,
+                        loss=loss,
+                        train_op=train_op,
+                        predictions={'predictions': model},
+                    )
             elif mode == tf.estimator.ModeKeys.EVAL:
                 loss = self.loss_tensor(model, labels)
                 self.summary_tensors('eval-summaries', model, labels, loss)
@@ -509,7 +502,7 @@ class TFNN(NN):
         'steps_between_evaluations': 1000,
 
         'outputs_dir': None,
-        'bucket_dir': 'gs://real-estate-modelling-temp-bucket/model',
+        'bucket_dir': None,
     }
 
     def show_live_results(self, outputs_folder, name):
