@@ -2,7 +2,6 @@ import os
 
 import pandas as pd
 import numpy as np
-# import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import (Normalize, LinearSegmentedColormap)

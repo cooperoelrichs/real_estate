@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from keras.callbacks import Callback
+from tensorflow.python.keras.callbacks import Callback
 
 
 class LivePlotter(Callback):
