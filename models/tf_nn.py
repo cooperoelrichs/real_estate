@@ -113,10 +113,16 @@ class TFNNModel(SimpleNeuralNetworkModel):
             model = self.model_tensor(features)
 
             if mode == tf.estimator.ModeKeys.PREDICT:
-                return tf.contrib.tpu.TPUEstimatorSpec(
-                    mode=mode,
-                    predictions={'predictions': model}
-                )
+                if self.USE_TPU:
+                    return tf.contrib.tpu.TPUEstimatorSpec(
+                        mode=mode,
+                        predictions={'predictions': model}
+                    )
+                else:
+                    return tf.estimator.EstimatorSpec(
+                        mode=mode,
+                        predictions={'predictions': model}
+                    )
             elif mode == tf.estimator.ModeKeys.TRAIN:
                 loss = self.loss_tensor(model, labels)
                 self.summary_tensors('train-summaries', model, labels, loss)
@@ -170,14 +176,19 @@ class TFNNModel(SimpleNeuralNetworkModel):
             elif mode == tf.estimator.ModeKeys.EVAL:
                 loss = self.loss_tensor(model, labels)
                 self.summary_tensors('eval-summaries', model, labels, loss)
+
+                mse = tf.metrics.mean_squared_error(labels, model)
+                mae = tf.metrics.mean_absolute_error(labels, model)
+                r2  = self.r2_metric(labels, model)
+
                 return tf.estimator.EstimatorSpec(
                     mode=mode,
                     loss=loss,
                     predictions={'predictions': model},
                     eval_metric_ops={
-                        'eval-summaries/mse': tf.metrics.mean_squared_error(labels, model),
-                        'eval-summaries/mae': tf.metrics.mean_absolute_error(labels, model),
-                        'eval-summaries/r2': self.r2_metric(labels, model)
+                        'eval-summaries/mse': mse,
+                        'eval-summaries/mae': mae,
+                        'eval-summaries/r2': r2
                     }
                 )
             else:
@@ -325,13 +336,8 @@ class TFNNModel(SimpleNeuralNetworkModel):
         X_scaled = X_scaled.astype(np.float32)
         y_test = y_test.astype(np.float32)
 
-        predict_ds_dir = self.save_predict_dataset(
-            X_scaled, self.model_dir
-        )
-        predict_input_fn = self.make_predict_input_fn(
-            predict_ds_dir
-        )
-
+        predict_ds_dir = self.save_predict_dataset(X_scaled, self.model_dir)
+        predict_input_fn = self.make_predict_input_fn(predict_ds_dir)
         y_pred = self.model.predict(predict_input_fn)
         y_pred = np.array([a['predictions'] for a in y_pred])
         return r2_score(y_test, y_pred)
@@ -436,15 +442,20 @@ class TFNNModel(SimpleNeuralNetworkModel):
 
             if (mode == tf.estimator.ModeKeys.TRAIN or
                 mode == tf.estimator.ModeKeys.EVAL):
+                shuffle = batch_size * 1000
+                shuffle_and_repeat = tf.contrib.data.shuffle_and_repeat
+                batch_and_drop = tf.contrib.data.batch_and_drop_remainder
+                
                 ds = ds.map(decode_x_and_y, num_parallel_calls=8)
+                ds = ds.cache()
+                ds = ds.apply(shuffle_and_repeat(shuffle, epochs))
+                ds = ds.apply(batch_and_drop(batch_size))
             elif mode == tf.estimator.ModeKeys.PREDICT:
-                ds = ds.map(decode_x_and_y, num_parallel_calls=8)
+                ds = ds.map(decode_x_only, num_parallel_calls=8)
+                ds = ds.cache().batch(batch_size)
 
-            ds = ds.cache()
-            ds = ds.apply(tf.contrib.data.shuffle_and_repeat(batch_size*100, epochs))
-            ds = ds.apply(tf.contrib.data.batch_and_drop_remainder(batch_size))
+
             ds = ds.prefetch(buffer_size=tf.contrib.data.AUTOTUNE)
-
             iterator = ds.make_one_shot_iterator()
             batch = iterator.get_next()
 
