@@ -28,6 +28,10 @@ class ModelSpecOptimisationPlotter():
 
     def plot(plot, output_file):
         f, axes = plt.subplots(1, len(plot), figsize=(10*len(plot), 10))
+
+        if len(plot) == 1:
+            axes = [axes]
+
         axes[0].set_ylabel('score')
         for i, sp in enumerate(plot):
             legend = []
