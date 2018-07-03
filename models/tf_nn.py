@@ -16,6 +16,7 @@ from real_estate.models.simple_nn import (
 from real_estate.models.price_model import PriceModel
 from real_estate.tf_utilities.train_and_evaluate import train_and_evaluate
 from real_estate.tf_utilities.validation_hook import ValidationHook
+from real_estate.tf_utilities.live_plots_hook import LivePlotsHook
 
 
 class TFNNModel(SimpleNeuralNetworkModel):
@@ -23,12 +24,13 @@ class TFNNModel(SimpleNeuralNetworkModel):
     USE_GPU = False
 
     def __init__(
-        self, learning_rate, learning_rate_decay, momentum,
+        self, name, learning_rate, learning_rate_decay, momentum,
         lambda_l1, lambda_l2, max_norm, batch_normalization, dropout_fractions,
         input_dim, epochs, batch_size, validation_split,
         layers, optimiser,
         outputs_dir, bucket_dir, steps_between_evaluations
     ):
+        self.name = name
         self.input_dim = input_dim
         self.layers = layers
         self.learning_rate = learning_rate
@@ -46,13 +48,12 @@ class TFNNModel(SimpleNeuralNetworkModel):
         self.steps_between_evaluations = steps_between_evaluations
 
         if self.USE_TPU:
-            model_dir = os.path.join(bucket_dir, 'model')
+            model_dir = os.path.join(bucket_dir, 'model', self.name)
         else:
-            model_dir = os.path.join(outputs_dir, 'model')
+            model_dir = os.path.join(outputs_dir, 'model', self.name)
 
         self.model_dir = model_dir
-        # self.train_dir = os.path.join(model_dir, 'train')
-        # self.eval_dir = os.path.join(model_dir, 'eval')
+        self.outputs_dir = outputs_dir
 
         self.del_model_dir()
         self.mk_model_dir()
@@ -349,10 +350,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
     #     return y_pred
 
     def add_hooks_for_validation(self, hooks, eval_ds):
-
-        validation_input_fn = self.make_train_input_fn(
-            eval_ds, 1
-        )
+        validation_input_fn = self.make_train_input_fn(eval_ds, 1)
         return hooks + [
             tf.train.CheckpointSaverHook(
                 checkpoint_dir=self.model_dir,
@@ -363,7 +361,11 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 {'batch_size': self.batch_size}, self.batch_size,
                 validation_input_fn, self.model_dir,
                 self.USE_TPU,
-                every_n_steps=self.steps_between_evaluations,
+                every_n_steps=self.steps_between_evaluations
+            ),
+            LivePlotsHook(
+                self.name, self.outputs_dir, self.model_dir,
+                every_n_steps=self.steps_between_evaluations
             )
         ]
 
@@ -445,7 +447,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
                 shuffle = batch_size * 1000
                 shuffle_and_repeat = tf.contrib.data.shuffle_and_repeat
                 batch_and_drop = tf.contrib.data.batch_and_drop_remainder
-                
+
                 ds = ds.map(decode_x_and_y, num_parallel_calls=8)
                 ds = ds.cache()
                 ds = ds.apply(shuffle_and_repeat(shuffle, epochs))

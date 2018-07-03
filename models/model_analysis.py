@@ -143,6 +143,7 @@ class ModelAnalysis():
         outputs_dir, test_name
     ):
         print('Scoring combination %i of %i.' % indicies)
+        params['name'] = test_name
         model = model_class(
             xy.X.values, xy.y.values,
             xy.X.columns.values,
