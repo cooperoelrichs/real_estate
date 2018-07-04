@@ -8,13 +8,12 @@ from tensorboard.backend.event_processing.event_accumulator import EventAccumula
 
 
 class LivePlotsHook(tf.train.SessionRunHook):
-    MIN_EPOCH = 1
     FIGSIZE = (15*2, 4*2)
     METRICS = (
-        ('r2', 'train-summaries/r2', 'eval-summaries/r2'),
-        ('mae', 'train-summaries/mae', 'eval-summaries/mae'),
-        ('mse', 'train-summaries/mse', 'eval-summaries/mse'),
-        ('loss', 'loss', 'loss'),
+        ('r2', 'train-summaries/r2', 'eval-summaries/r2', (0.4, 1)),
+        ('mae', 'train-summaries/mae', 'eval-summaries/mae', (0, 1e6)),
+        ('mse', 'train-summaries/mse', 'eval-summaries/mse', (0, 2e11)),
+        ('loss', 'loss', 'loss', (0, 2e11)),
     )
 
     def __init__(
@@ -60,14 +59,14 @@ class LivePlotsHook(tf.train.SessionRunHook):
             eval_reloaded = True
 
             for i, metrics in enumerate(self.METRICS):
-                metric_name, train_m, eval_m = metrics
+                metric_name, train_m, eval_m, clip = metrics
                 self.axes[i].clear()
                 self.axes[i].set_title(metric_name)
                 self.axes[i].set_xlabel('epoch')
 
-                self.plot_values(train_m, i, self._train_acc, 'training')
+                self.plot_values(train_m, i, self._train_acc, clip, 'training')
                 if eval_reloaded:
-                    self.plot_values(eval_m, i, self._eval_acc, 'evaluation')
+                    self.plot_values(eval_m, i, self._eval_acc, clip, 'evaluation')
 
                 self.axes[i].legend()
 
@@ -81,14 +80,19 @@ class LivePlotsHook(tf.train.SessionRunHook):
 
         self._iter_count += 1
 
-    def plot_values(self, metric, i, accumulator, label):
-        x, y = self.extract_values(metric, accumulator)
+    def plot_values(self, metric, i, accumulator, clip, label):
+        x, y = self.extract_values(metric, accumulator, clip)
         self.axes[i].plot(x, y, label=label)
 
-    def extract_values(self, metric, accumulator):
+    def extract_values(self, metric, accumulator, clip):
         if metric in accumulator.Tags()['scalars']:
-            x = [scalar.step for scalar in accumulator.Scalars(metric)]
-            y = [scalar.value for scalar in accumulator.Scalars(metric)]
-            return x[self.MIN_EPOCH:], y[self.MIN_EPOCH:]
+            values = [
+                (scalar.step, scalar.value)
+                for scalar in accumulator.Scalars(metric)[1:]
+                if (scalar.value >= clip[0]) and (scalar.value <= clip[1])
+            ]
+            X = [x for x, _ in values]
+            Y = [y for _, y in values]
+            return X, Y
         else:
             return [], []
