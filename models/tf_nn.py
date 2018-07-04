@@ -63,7 +63,6 @@ class TFNNModel(SimpleNeuralNetworkModel):
         # self.activation
         # self.kernel_initializer
         # self.loss
-        # self.optimizer
 
         self.model_checks()
 
@@ -127,38 +126,7 @@ class TFNNModel(SimpleNeuralNetworkModel):
             elif mode == tf.estimator.ModeKeys.TRAIN:
                 loss = self.loss_tensor(model, labels)
                 self.summary_tensors('train-summaries', model, labels, loss)
-
-                if self.optimiser_name == 'sgd':
-                    learning_rate = tf.train.inverse_time_decay(
-                        learning_rate=self.learning_rate,
-                        global_step=tf.train.get_global_step(),
-                        decay_steps=1,
-                        decay_rate=self.learning_rate_decay,
-                    )
-                    optimizer = tf.train.MomentumOptimizer(
-                        learning_rate=learning_rate,
-                        momentum=self.momentum,
-                        use_nesterov=True
-                    )
-                    optimizer = self.maybe_to_tpu_optimizer(optimizer)
-
-                    clipped_grad_var_pairs = [
-                        (self.clip_by_value(dx, -1., 1.), x)
-                        for dx, x in optimizer.compute_gradients(loss)
-                    ]
-                    train_op = optimizer.apply_gradients(
-                        clipped_grad_var_pairs,
-                        global_step=tf.train.get_global_step()
-                    )
-
-                elif self.optimiser_name == 'adam':
-                    optimizer = tf.train.AdamOptimizer(
-                        learning_rate=self.learning_rate,
-                    )
-                    optimizer = self.maybe_to_tpu_optimizer(optimizer)
-                    train_op = optimizer.minimize(
-                        loss, global_step=tf.train.get_global_step()
-                    )
+                train_op = self.build_train_op_tensor(loss)
 
                 if self.USE_TPU:
                     return tf.contrib.tpu.TPUEstimatorSpec(
@@ -195,6 +163,45 @@ class TFNNModel(SimpleNeuralNetworkModel):
             else:
                 raise ValueError("Mode '%s' not supported." % mode)
         return model_fn
+
+    def build_train_op_tensor(self, loss):
+        if self.optimiser_name == 'sgd':
+            learning_rate = tf.train.inverse_time_decay(
+                learning_rate=self.learning_rate,
+                global_step=tf.train.get_global_step(),
+                decay_steps=1,
+                decay_rate=self.learning_rate_decay,
+            )
+            optimizer = tf.train.MomentumOptimizer(
+                learning_rate=learning_rate,
+                momentum=self.momentum,
+                use_nesterov=True
+            )
+
+        elif self.optimiser_name == 'adam':
+            optimizer = tf.train.AdamOptimizer(
+                learning_rate=self.learning_rate,
+            )
+
+        elif self.optimiser_name == 'nadam':
+            optimizer = tf.contrib.opt.NadamOptimizer(
+                learning_rate=self.learning_rate,
+            )
+
+        optimizer = self.maybe_to_tpu_optimizer(optimizer)
+        train_op = self.clip_and_apply_grads(optimizer, loss)
+        return train_op
+
+    def clip_and_apply_grads(self, optimizer, loss):
+        clipped_grad_var_pairs = [
+            (self.clip_by_value(dx, -1., 1.), x)
+            for dx, x in optimizer.compute_gradients(loss)
+        ]
+        train_op = optimizer.apply_gradients(
+            clipped_grad_var_pairs,
+            global_step=tf.train.get_global_step()
+        )
+        return train_op
 
     def clip_by_value(self, tensor, min_val, max_val):
         return tf.clip_by_value(tensor, min_val, max_val)
