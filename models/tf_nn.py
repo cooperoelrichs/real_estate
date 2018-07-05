@@ -67,10 +67,14 @@ class TFNNModel(SimpleNeuralNetworkModel):
         self.model_checks()
 
     def model_checks(self):
-        if self.dropout_fractions is not None and (
-            len(self.layers) != len(self.dropout_fractions)
+        if (
+            not (self.dropout_fractions is False) and
+            not isinstance(self.dropout_fractions, float)
         ):
-            raise ValueError('Layers and dropout fractions are not consistant.')
+            raise ValueError(
+                'Dropout fractions should be False or float, instead it was %s.'
+                % str(type(self.dropout_fractions))
+            )
 
     def del_model_dir(self):
         try:
@@ -231,8 +235,8 @@ class TFNNModel(SimpleNeuralNetworkModel):
 
             model = tf.keras.layers.PReLU()(model)
 
-            if self.dropout_fractions is not None:
-                model = tf.layers.Dropout(self.dropout_fractions[i])(model)
+            if self.dropout_fractions and i != (len(self.layers) - 1):
+                model = tf.layers.Dropout(self.dropout_fractions)(model)
 
         model = tf.layers.Dense(
             units=1,
@@ -514,7 +518,7 @@ class TFNN(NN):
         'lambda_l2': None,
         'max_norm': None,
         'batch_normalization': None,
-        'dropout_fractions': None,
+        'dropout_fractions': False,
         'epochs': None,
         'batch_size': None,
         'optimiser': 'sgd',
