@@ -10,7 +10,7 @@ from tensorboard.backend.event_processing.event_accumulator import EventAccumula
 class LivePlotsHook(tf.train.SessionRunHook):
     FIGSIZE = (15*2, 4*2)
     METRICS = (
-        ('r2', 'train-summaries/r2', 'eval-summaries/r2', (0.4, 1)),
+        ('r2', 'train-summaries/r2', 'eval-summaries/r2', (0, 1)),
         ('mae', 'train-summaries/mae', 'eval-summaries/mae', (0, 1e6)),
         ('mse', 'train-summaries/mse', 'eval-summaries/mse', (0, 2e11)),
         ('loss', 'loss', 'loss', (0, 2e11)),
