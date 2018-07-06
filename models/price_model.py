@@ -5,7 +5,7 @@ from sklearn.metrics import mean_absolute_error
 
 class PriceModel(object):
     def __init__(self, X, y, X_labels, params):
-        if params == None:
+        if params is None:
             self.model = self.MODEL_CLASS(**self.PARAMS)
         else:
             self.model = self.MODEL_CLASS(**params)
