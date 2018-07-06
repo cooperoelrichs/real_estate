@@ -344,21 +344,19 @@ class TFNNModel(SimpleNeuralNetworkModel):
         return loss_and_metrics
 
     def score(self, X_test, y_test):
-        X_scaled = self.x_scaler.transform(X_test)
-        X_scaled = X_scaled.astype(np.float32)
         y_test = y_test.astype(np.float32)
+        y_pred = self.predict(X_test)
+        return r2_score(y_test, y_pred)
+
+    def predict(self, X_pred):
+        X_scaled = self.x_scaler.transform(X_pred)
+        X_scaled = X_scaled.astype(np.float32)
 
         predict_ds_dir = self.save_predict_dataset(X_scaled, self.model_dir)
         predict_input_fn = self.make_predict_input_fn(predict_ds_dir)
-        y_pred = self.model.predict(predict_input_fn)
+        y_pred = self.model.predict(predict_input_fn)  # yield_single_examples=False
         y_pred = np.array([a['predictions'] for a in y_pred])
-        return r2_score(y_test, y_pred)
-
-    # def predict(self, X_pred):
-    #     X_scaled = self.x_scaler.transform(X_pred)
-    #     X_scaled = X_scaled.astype(np.float32)
-    #     y_pred = self.model.predict(input_fn, yield_single_examples=False)
-    #     return y_pred
+        return y_pred
 
     def add_hooks_for_validation(self, hooks, eval_ds):
         validation_input_fn = self.make_train_input_fn(eval_ds, 1)
@@ -509,21 +507,21 @@ class TFNN(NN):
     MODEL_CLASS = TFNNModel
 
     PARAMS = {
-        'input_dim': None,
-        'layers': None,
-        'learning_rate': None,
-        'learning_rate_decay': None,
-        'momentum': None,
-        'lambda_l1': None,
-        'lambda_l2': None,
-        'max_norm': None,
-        'batch_normalization': None,
+        'name': 'base_tf_nn',
+        'layers': (2**8,)*5,
+        'learning_rate': 1e-2,
+        'learning_rate_decay': 0.01,
+        'momentum': 0.95,
+        'lambda_l1': 1.,
+        'lambda_l2': 1.,
+        'max_norm': False,
+        'batch_normalization': False,
         'dropout_fractions': False,
-        'epochs': None,
-        'batch_size': None,
+        'epochs': 350,
+        'batch_size': 2**12,
         'optimiser': 'sgd',
-        'validation_split': 0.2,
-        'steps_between_evaluations': 1000,
+        'validation_split': 0.3,
+        'steps_between_evaluations': 5000,
 
         'outputs_dir': None,
         'bucket_dir': None,
