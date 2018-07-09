@@ -9,6 +9,7 @@ from tensorflow.python.keras.callbacks import TensorBoard
 from tensorflow.python.keras.layers import (
     Dense, Dropout, Activation, BatchNormalization, PReLU)
 
+from real_estate.models.tf_model_base import ModelBase
 from real_estate.models.price_model import PriceModel
 from real_estate.models.nn_base import EmptyKerasModel
 from real_estate.models.live_keras_plotter import LivePlotter
@@ -42,6 +43,23 @@ class SimpleNeuralNetworkModel(EmptyKerasModel):
         self.callbacks.append(TensorBoard(
             log_dir=os.path.join(self.outputs_dir, 'model')
         ))
+
+    def get_model_dir(outputs_dir, bucket_dir):
+        if self.USE_TPU:
+            base = bucket_dir
+        else:
+            base = outputs_dir
+
+        return os.path.join(base, 'model', self.name)
+
+    def del_model_dir(self):
+        try:
+            tf.gfile.DeleteRecursively(self.model_dir)
+        except NotFoundError:
+            pass
+
+    def mk_model_dir(self):
+        tf.gfile.MkDir(self.model_dir)
 
     def compile_model(self):
         if self.dropout_fractions is not None and (
@@ -121,7 +139,7 @@ class SimpleNeuralNetworkModel(EmptyKerasModel):
         return model
 
 
-class NN(PriceModel):
+class NN(ModelBase):
     HAS_SIMPLE_COEFS = False
     HAS_FEATURE_IMPORTANCE = False
     MODEL_CLASS = SimpleNeuralNetworkModel
