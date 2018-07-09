@@ -33,10 +33,10 @@ class XY(object):
         # (('bedrooms', 'suburb'), 'linear_by_categorical'),
         # (('garage_spaces', 'suburb'), 'linear_by_categorical'),
 
-        (('property_type',), 'categorical'),
+        # (('property_type',), 'categorical'),
         # (('suburb',), 'categorical'),
 
-        # (('property_type',), 'numerically_encoded'),
+        (('property_type',), 'numerically_encoded'),
         # (('suburb',), 'numerically_encoded'),
         # (('road',), 'numerically_encoded'),
     ]
