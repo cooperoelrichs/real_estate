@@ -11,6 +11,9 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from real_estate.models.tf_model_base import TFModelBase
 from real_estate.models.price_model import PriceModel
+from tensorflow.contrib.boosted_trees.estimator_batch.estimator import (
+    GradientBoostedDecisionTreeRegressor)
+from tensorflow.contrib.boosted_trees.proto import learner_pb2
 
 
 class TFBTModel(TFModelBase):
@@ -20,7 +23,7 @@ class TFBTModel(TFModelBase):
     """
 
     USE_TPU = False
-    USE_GPU = True
+    USE_GPU = False
 
     def __init__(
         self, name,
@@ -68,6 +71,24 @@ class TFBTModel(TFModelBase):
             config=self.get_simple_run_config()
         )
 
+        # learner_config = learner_pb2.LearnerConfig()
+        # learner_config.growing_mode = learner_pb2.LearnerConfig.LAYER_BY_LAYER
+        # learner_config.learning_rate_tuner.fixed.learning_rate = self.learning_rate
+        # learner_config.regularization.l1 = self.l1_regularization
+        # learner_config.regularization.l2 = self.l2_regularization
+        # learner_config.constraints.max_tree_depth = self.max_depth
+        #
+        # return GradientBoostedDecisionTreeRegressor(
+        #     learner_config,
+        #     examples_per_layer=10,
+        #     label_dimension=1,
+        #     num_trees=self.n_trees,
+        #     feature_columns=self.gen_feature_columns(),
+        #     label_name=None,
+        #     model_dir=self.model_dir,
+        #     config=self.get_simple_run_config()
+        # )
+
     def gen_feature_columns(self):
         return list(map(self.make_feature_column, self.feature_column_specs))
 
@@ -97,10 +118,10 @@ class TFBTModel(TFModelBase):
                     features[name] = tf.train.Feature(
                         float_list=tf.train.FloatList(value=[X[i, j]])
                     )
+
                 writer.write(tf.train.Example(
                     features=tf.train.Features(feature=features)
                 ).SerializeToString())
-
 
         if mode in (tf.estimator.ModeKeys.TRAIN, tf.estimator.ModeKeys.EVAL):
             y_fn = os.path.join(run_dir, 'data-y-{}.tfrecords'.format(mode))
@@ -129,17 +150,17 @@ class TFBTModel(TFModelBase):
                     shape=(1,), dtype=tf.float32, allow_missing=True
                 )
 
+            print(features)
+
             parsed_features = tf.parse_single_example(example, features)
             return parsed_features
 
         def decode_y(example):
-            features = {
-                'label': tf.FixedLenSequenceFeature(
-                    shape=(1,), dtype=tf.float32, allow_missing=True
-                )
-            }
+            features = {'label': tf.FixedLenSequenceFeature(
+                shape=(1,), dtype=tf.float32, allow_missing=True
+            )}
             parsed_features = tf.parse_single_example(example, features)
-            return parsed_features['label'][0, 0]
+            return parsed_features['label']
 
         def input_fn():
             batch_size = self.batch_size
@@ -162,7 +183,6 @@ class TFBTModel(TFModelBase):
             elif mode == tf.estimator.ModeKeys.PREDICT:
                 ds = tf.data.TFRecordDataset(ds_files[0])
                 ds = ds.map(decode_x, num_parallel_calls=8)
-                ds = ds.map(decode_x, num_parallel_calls=8)
                 ds = ds.cache()
                 # ds = ds.batch(batch_size)
 
@@ -184,12 +204,12 @@ class TFBT(PriceModel):
     MODEL_CLASS = TFBTModel
     PARAMS = {
         'name': 'tf_bt',
-        'n_batches_per_layer': 100,
-        'n_trees': 100,
-        'max_depth': 6,
+        'n_batches_per_layer': 10,
+        'n_trees': 1000,
+        'max_depth': 5,
         'learning_rate': 0.1,
-        'l1_regularization': 0.0,
-        'l2_regularization': 0.0,
+        'l1_regularization': 1.,
+        'l2_regularization': 1.,
         'tree_complexity': 0.0,
         'min_node_weight': 0.0,
         'batch_size': 2**12,
